@@ -147,6 +147,13 @@ export class Mirror {
     sheen.addColorStop(0.6, 'rgba(255,255,255,0)');
     g.fillStyle = sheen;
     g.fillRect(0, 0, w, h);
+
+    // The glass edge, so the mirror still has an outline when the housing is unlit.
+    g.strokeStyle = 'rgba(170,178,192,.55)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.roundRect(1, 1, w - 2, h - 2, (RADIUS / WIDTH) * w);
+    g.stroke();
   }
 
   private glow(x: number, y: number, r: number, rgb: string, alpha: number): void {
