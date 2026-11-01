@@ -4,7 +4,9 @@ import { MATERIALS, LAMP_KINDS } from './materials';
 import { INTERIOR_LAYER, type Stage } from './stage';
 import { TILING_NOISE } from './textures';
 
-const REFLECTION_HEIGHT = 360;
+/** Short side of the reflection in pixels; a fixed height would starve portrait of width. */
+const REFLECTION_SHORT_SIDE = 360;
+const REFLECTION_LONG_SIDE = 720;
 /** Below this the road is effectively dry, so the reflection pass is skipped. */
 const MIN_WET = 0.03;
 /** Snow is dimmer under headlights, whose tuning for dark asphalt would otherwise blow it out to white. */
@@ -52,19 +54,21 @@ roughnessFactor = mix(mix(roughnessFactor, 0.2, wetMask), 0.85, snowMask);
 `;
 
 /* Sampled in a vertical smear, because rough wet asphalt stretches lights
-   towards the viewer, with the road's texture breaking up the edges. */
+   towards the viewer. The jitter stops thin lights splitting into a ladder of
+   bands; it has to be per-pixel, as anything coarser turns high-contrast edges
+   like the barrier into visible blocks. */
 const REFLECTION_GLSL = `
 if (wetMask > 0.001) {
   vec2 reflectionUv = vReflection.xy / vReflection.w;
   // Fades with distance, where the road's noise is too fine and would alias into a zigzag.
   reflectionUv.x += (roadNoise - 0.5) * 0.02 * clamp(4.0 / length(vViewPosition), 0.0, 1.0);
+  float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
   vec3 reflected = vec3(0.0);
-  for (int i = -2; i <= 2; i++) {
-    // Jittered per pixel, or thin bright lights like overpass tubes split into a ladder of bands.
-    float offset = (float(i) + (roadDetail - 0.5) * 2.0) * 0.012;
-    reflected += texture2D(tReflection, reflectionUv + vec2(0.0, offset)).rgb * (3.0 - abs(float(i)));
+  for (int i = -3; i <= 3; i++) {
+    float offset = (float(i) + jitter - 0.5) * 0.008;
+    reflected += texture2D(tReflection, reflectionUv + vec2(0.0, offset)).rgb * (4.0 - abs(float(i)));
   }
-  reflected /= 9.0;
+  reflected /= 16.0;
   float facing = clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0);
   float fresnel = mix(0.1, 1.0, pow(1.0 - facing, 5.0));
   // Capped so the lamp overhead can't wash the whole road near the car.
@@ -80,7 +84,8 @@ if (wetMask > 0.001) {
  * Must be created before the road geometry, since bending wraps this shader.
  */
 export class RoadSurface {
-  private readonly target = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType });
+  // Multisampled because the rail's long diagonal edge otherwise shows up in the road as a row of steps.
+  private readonly target = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 });
   private readonly virtualCamera = new THREE.PerspectiveCamera();
   private readonly reflectionMatrix = new THREE.Matrix4();
   private readonly wet = { value: 0 };
@@ -119,8 +124,8 @@ export class RoadSurface {
     road.customProgramCacheKey = () => 'road-surface';
 
     stage.onResize((w, h) => {
-      const height = Math.min(REFLECTION_HEIGHT, h);
-      this.target.setSize(Math.max(1, Math.round((height * w) / h)), height);
+      const scale = Math.min(REFLECTION_SHORT_SIDE / Math.min(w, h), REFLECTION_LONG_SIDE / Math.max(w, h), 1);
+      this.target.setSize(Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
     });
   }
 

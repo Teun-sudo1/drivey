@@ -62,6 +62,7 @@ export class Drive {
       Math.sin(t * 0.5) * 0.002 * sway
     );
     this.cockpit.roof.position.y = framing.roofY;
+    this.cockpit.mirror.place(framing);
     this.cockpit.wheel.rotation.z = this.bend * 900;
   }
 }

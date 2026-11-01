@@ -33,6 +33,7 @@ import { Particles } from './weather/particles';
 import { TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './weather/tables';
 import { createWindshield } from './weather/windshield';
 
+const MIRROR_GAP_PX = 8;
 const MOBILE_PARTICLES = 1100;
 const DESKTOP_PARTICLES = 2000;
 
@@ -69,6 +70,8 @@ const hud = createHud(
   (txt, label) => cockpit.showTime(txt, label)
 );
 const surface = createControlSurface(() => idle.wake());
+const topBar = $('#top');
+stage.onResize(() => stage.setMirrorTop(topBar.getBoundingClientRect().bottom + MIRROR_GAP_PX));
 const idle = createIdleFade(() => timer.running && !surface.isOpen());
 
 $('#btnSkip').addEventListener('click', () => {

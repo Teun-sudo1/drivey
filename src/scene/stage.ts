@@ -5,18 +5,28 @@ import { damp, lerp } from '../lib/math';
 /** Objects the driver sees but the road's reflection doesn't. */
 export const INTERIOR_LAYER = 1;
 
+/** How far ahead of the eye the rear-view mirror hangs. */
+export const MIRROR_DISTANCE = 0.78;
+export const MIRROR_OUTER_HEIGHT = 0.087;
+
 const EYE_HEIGHT = 1.22;
 const NEAR = 0.15; // far enough out to keep depth precision for the road decals
 const REFRAME_RATE = 6;
 
+const FRAMING_KEYS = ['fov', 'pitch', 'roofY', 'mirrorX', 'mirrorY', 'mirrorYaw'] as const;
+
 /** How the camera frames the car in each orientation. */
-interface Framing {
+export interface Framing {
   fov: number;
   pitch: number;
   roofY: number;
+  mirrorX: number;
+  mirrorY: number;
+  mirrorYaw: number;
 }
-const LANDSCAPE: Framing = { fov: 55, pitch: -0.04, roofY: 0 };
-const PORTRAIT: Framing = { fov: 70, pitch: 0.07, roofY: 0.42 };
+const LANDSCAPE: Framing = { fov: 55, pitch: -0.04, roofY: 0, mirrorX: -0.33, mirrorY: 0.29, mirrorYaw: 0.12 };
+/** The roof is framed out of view here, so the mirror hangs just below the top bar instead; see targetFraming. */
+const PORTRAIT: Framing = { fov: 70, pitch: 0.07, roofY: 0.42, mirrorX: -0.03, mirrorY: 0, mirrorYaw: 0.03 };
 
 export class Stage {
   readonly renderer: THREE.WebGLRenderer;
@@ -29,6 +39,7 @@ export class Stage {
   private readonly skyTexture: THREE.CanvasTexture;
   private readonly resizeListeners = new Set<(w: number, h: number, pixelRatio: number) => void>();
   private settled = false;
+  private mirrorTopPx = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -66,15 +77,19 @@ export class Stage {
     listener(innerWidth, innerHeight, this.renderer.getPixelRatio());
   }
 
+  /** Where the mirror's top edge should sit in portrait, in CSS pixels from the top of the screen. */
+  setMirrorTop(px: number): void {
+    this.mirrorTopPx = px;
+    this.settled = false;
+  }
+
   /** Eases towards the framing for the current orientation, so rotation doesn't jump. */
   updateFraming(dt: number, snap: boolean): void {
     if (this.settled) return;
     const target = this.targetFraming();
     const k = snap ? 1 : damp(REFRAME_RATE, dt);
-    this.framing.fov = lerp(this.framing.fov, target.fov, k);
-    this.framing.pitch = lerp(this.framing.pitch, target.pitch, k);
-    this.framing.roofY = lerp(this.framing.roofY, target.roofY, k);
-    if (Math.abs(this.framing.fov - target.fov) < 0.01) {
+    for (const key of FRAMING_KEYS) this.framing[key] = lerp(this.framing[key], target[key], k);
+    if (FRAMING_KEYS.every(key => Math.abs(this.framing[key] - target[key]) < 0.002)) {
       Object.assign(this.framing, target);
       this.settled = true;
     }
@@ -83,7 +98,12 @@ export class Stage {
   }
 
   private targetFraming(): Framing {
-    return innerHeight > innerWidth ? PORTRAIT : LANDSCAPE;
+    if (innerHeight <= innerWidth) return LANDSCAPE;
+    // The cockpit hangs off the camera, so this is plain projection with no pitch involved.
+    const focal = innerHeight / 2 / Math.tan(THREE.MathUtils.degToRad(PORTRAIT.fov / 2));
+    const heightPx = (MIRROR_OUTER_HEIGHT / MIRROR_DISTANCE) * focal;
+    const centerPx = this.mirrorTopPx + heightPx / 2;
+    return { ...PORTRAIT, mirrorY: ((innerHeight / 2 - centerPx) / focal) * MIRROR_DISTANCE };
   }
 
   private resize(): void {

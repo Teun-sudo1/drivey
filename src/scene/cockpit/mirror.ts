@@ -2,10 +2,13 @@ import * as THREE from 'three';
 import { colorTexture, createCanvas } from '../../lib/canvas';
 import { clamp } from '../../lib/math';
 import { BOX, mesh } from '../geometry';
+import { MIRROR_DISTANCE, MIRROR_OUTER_HEIGHT, type Framing } from '../stage';
 import type { GlassOccluder } from './cockpit';
 
-const WIDTH = 0.26, HEIGHT = 0.075, RADIUS = 0.024;
+const HOUSING_MARGIN = 0.012;
+const WIDTH = 0.26, HEIGHT = MIRROR_OUTER_HEIGHT - HOUSING_MARGIN, RADIUS = 0.024;
 const ROOF_Y = 0.49;
+const STEM_WIDTH = 0.018;
 const CANVAS_W = 320, CANVAS_H = 92;
 const DRAW_INTERVAL = 1 / 15;
 const LAMP_SPACING = 20, LAMP_COUNT = 5;
@@ -66,6 +69,9 @@ export class Mirror {
   /** Its outline, so the windshield layer can leave it out. */
   readonly occluders: GlassOccluder[];
 
+  private readonly group = new THREE.Group();
+  private readonly stem: THREE.Mesh;
+  private readonly stemOutline: THREE.Vector3[];
   private readonly ctx: CanvasRenderingContext2D;
   private readonly texture: THREE.CanvasTexture;
   private readonly skyTop = new THREE.Color();
@@ -81,31 +87,41 @@ export class Mirror {
   private travelled = 0;
   private clock = 0;
 
-  constructor(roof: THREE.Object3D, housing: THREE.Material) {
+  constructor(parent: THREE.Object3D, housing: THREE.Material) {
     const { canvas, ctx } = createCanvas(CANVAS_W, CANVAS_H);
     this.ctx = ctx;
     this.texture = colorTexture(canvas);
 
-    const group = new THREE.Group();
-    group.position.set(-0.33, 0.29, -0.78);
-    group.rotation.y = 0.12; // angled towards the driver, who sits on the right
-    roof.add(group);
+    const group = this.group;
+    group.position.z = -MIRROR_DISTANCE;
+    parent.add(group);
 
     const bodyDepth = 0.022;
-    const body = new THREE.Mesh(new THREE.ExtrudeGeometry(roundedRect(WIDTH + 0.012, HEIGHT + 0.012, RADIUS + 0.006), { depth: bodyDepth, bevelEnabled: false, curveSegments: 8 }), housing);
+    const body = new THREE.Mesh(new THREE.ExtrudeGeometry(roundedRect(WIDTH + HOUSING_MARGIN, HEIGHT + HOUSING_MARGIN, RADIUS + HOUSING_MARGIN / 2), { depth: bodyDepth, bevelEnabled: false, curveSegments: 8 }), housing);
     body.position.z = -bodyDepth;
     group.add(body);
     const face = new THREE.Mesh(faceGeometry(), new THREE.MeshBasicMaterial({ map: this.texture, toneMapped: false }));
     face.position.z = 0.001;
     group.add(face);
-    const stemBottom = HEIGHT / 2, stemTop = ROOF_Y - group.position.y;
-    mesh(BOX, housing, 0, (stemBottom + stemTop) / 2, -bodyDepth / 2, 0.018, stemTop - stemBottom, 0.012, group);
+    this.stem = mesh(BOX, housing, 0, 0, -bodyDepth / 2, STEM_WIDTH, 1, 0.012, group);
 
-    const hw = (WIDTH + 0.012) / 2, hh = (HEIGHT + 0.012) / 2;
+    const hw = (WIDTH + HOUSING_MARGIN) / 2, hh = (HEIGHT + HOUSING_MARGIN) / 2;
+    this.stemOutline = quad(-STEM_WIDTH / 2, STEM_WIDTH / 2, HEIGHT / 2, HEIGHT / 2);
     this.occluders = [
       { object: group, points: quad(-hw, hw, -hh, hh) },
-      { object: group, points: quad(-0.009, 0.009, stemBottom, stemTop) }
+      { object: group, points: this.stemOutline }
     ];
+  }
+
+  /** Follows the framing, with its stem reaching up to wherever the roof is. */
+  place(framing: Framing): void {
+    this.group.position.x = framing.mirrorX;
+    this.group.position.y = framing.mirrorY;
+    this.group.rotation.y = framing.mirrorYaw; // angled towards the driver, who sits on the right
+    const stemBottom = HEIGHT / 2, stemTop = ROOF_Y + framing.roofY - framing.mirrorY;
+    this.stem.position.y = (stemBottom + stemTop) / 2;
+    this.stem.scale.y = stemTop - stemBottom;
+    this.stemOutline[2].y = this.stemOutline[3].y = stemTop;
   }
 
   setEnvironment(env: MirrorEnvironment): void {

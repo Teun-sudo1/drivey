@@ -8,7 +8,6 @@ import { createNav } from './nav';
 
 const GAUGE_INTERVAL = 0.1;
 const NAV_INTERVAL = 0.25;
-const MIRROR_HIDDEN_ROOF_Y = 0.2;
 
 /** Part of the interior that sits in front of the windshield, as a polygon local to `object`. */
 export interface GlassOccluder {
@@ -68,7 +67,7 @@ export class Cockpit {
 
     root.add(this.roof);
     mesh(BOX, intB, -0.35, 0.52, -0.82, 2.8, 0.07, 0.55, this.roof);
-    this.mirror = new Mirror(this.roof, intB);
+    this.mirror = new Mirror(root, intB);
 
     this.dashLight.position.set(0, -0.36, -0.82);
     this.passLight.position.set(-0.2, 0.55, -0.5);
@@ -86,8 +85,7 @@ export class Cockpit {
   }
 
   update(dt: number, speed: number, bend: number, clock: number): void {
-    // In portrait the roof, and the mirror with it, is framed out of view.
-    if (this.roof.position.y < MIRROR_HIDDEN_ROOF_Y) this.mirror.update(dt, speed, bend);
+    this.mirror.update(dt, speed, bend);
     this.gaugeTimer += dt;
     if (this.gaugeTimer >= GAUGE_INTERVAL) {
       this.gaugeTimer = 0;

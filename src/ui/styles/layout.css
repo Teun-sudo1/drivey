@@ -26,7 +26,7 @@ body.reduced #grain { animation: none; }
   top: calc(14px + var(--st)); left: calc(14px + var(--sl)); right: calc(14px + var(--sr));
 }
 #top .spacer { flex: 1; }
-#timerWrap { position: absolute; left: 0; right: 0; top: 20%; text-align: center; pointer-events: none; }
+#timerWrap { position: absolute; left: 0; right: 0; top: max(20%, calc(140px + var(--st))); text-align: center; pointer-events: none; }
 #time {
   font-family: var(--mono); font-size: min(24vw, 150px); line-height: 1; letter-spacing: .02em;
   text-shadow: 0 0 30px rgba(255, 180, 107, .25), 0 2px 18px rgba(0, 0, 0, .6);
