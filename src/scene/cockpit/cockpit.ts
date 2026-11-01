@@ -9,6 +9,12 @@ const GAUGE_INTERVAL = 0.1;
 const NAV_INTERVAL = 0.25;
 const MIRROR_HIDDEN_ROOF_Y = 0.2;
 
+/** Part of the interior that sits in front of the windshield, as a polygon local to `object`. */
+export interface GlassOccluder {
+  object: THREE.Object3D;
+  points: THREE.Vector3[];
+}
+
 /** Low-poly interior, parented to the camera so it never leaves the frame. */
 export class Cockpit {
   readonly dashLight = new THREE.PointLight(0xff9a50, 0.1, 0.8, 2);
@@ -16,6 +22,7 @@ export class Cockpit {
   readonly roof = new THREE.Group();
   readonly wheel = new THREE.Group();
   readonly mirror: Mirror;
+  readonly glassOccluders: GlassOccluder[];
 
   private readonly gauges = createGauges();
   private readonly lcd = createLcd();
@@ -66,6 +73,13 @@ export class Cockpit {
     root.add(this.dashLight, this.passLight);
 
     this.addPillars(root, intB);
+
+    const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+    this.glassOccluders = [
+      ...this.mirror.occluders,
+      { object: navUnit, points: [V(-0.1, -0.145, 0), V(0.1, -0.145, 0), V(0.1, 0.145, 0), V(-0.1, 0.145, 0)] },
+      { object: root, points: [V(-0.29, -0.265, -1.02), V(0.29, -0.265, -1.02), V(0.29, -0.5, -0.9), V(-0.29, -0.5, -0.9)] }
+    ];
   }
 
   update(dt: number, speed: number, bend: number, clock: number): void {

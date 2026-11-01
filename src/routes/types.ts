@@ -18,8 +18,12 @@ export interface Chunk {
   buildings: THREE.Mesh[];
 }
 
+export type LampTint = 'teal' | 'sodium';
+
 export interface RouteDefinition {
   name: string;
+  /** The lamp colour windshield drops pick up on this route. */
+  lampTint: LampTint;
   /** Cruising speed in m/s. */
   speed: number;
   /** Largest bend coefficient the road may curve to. */

@@ -8,6 +8,7 @@
 </head>
 <body>
 <canvas id="gl" aria-hidden="true"></canvas>
+<canvas id="glass" aria-hidden="true"></canvas>
 <div id="vignette"></div>
 <div id="grain"></div>
 
@@ -44,6 +45,10 @@
       <p class="note">Keys: Space start/pause · F fullscreen · H hide UI</p>
     </section>
     <section id="tab-scene">
+      <h4>Time of day</h4>
+      <div class="seg" id="segTod" aria-label="Time of day"></div>
+      <h4>Weather</h4>
+      <div class="seg" id="segWeather" aria-label="Weather"></div>
       <h4>Graphics</h4>
       <div class="tog" data-k="bloom">Bloom</div>
       <div class="tog" data-k="vignette">Vignette</div>

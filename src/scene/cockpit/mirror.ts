@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { colorTexture, createCanvas } from '../../lib/canvas';
 import { BOX, mesh } from '../geometry';
+import type { GlassOccluder } from './cockpit';
 
 const WIDTH = 0.26, HEIGHT = 0.075, RADIUS = 0.024;
 const ROOF_Y = 0.49;
@@ -37,11 +38,18 @@ function faceGeometry(): THREE.ShapeGeometry {
   return g;
 }
 
+function quad(x0: number, x1: number, y0: number, y1: number): THREE.Vector3[] {
+  return [new THREE.Vector3(x0, y0, 0), new THREE.Vector3(x1, y0, 0), new THREE.Vector3(x1, y1, 0), new THREE.Vector3(x0, y1, 0)];
+}
+
 /**
  * The view behind the car, painted on a small canvas rather than rendered from
  * a second camera, which would double the scene's draw calls.
  */
 export class Mirror {
+  /** Its outline, so the windshield layer can leave it out. */
+  readonly occluders: GlassOccluder[];
+
   private readonly ctx: CanvasRenderingContext2D;
   private readonly texture: THREE.CanvasTexture;
   private readonly skyTop = new THREE.Color();
@@ -71,6 +79,12 @@ export class Mirror {
     group.add(face);
     const stemBottom = HEIGHT / 2, stemTop = ROOF_Y - group.position.y;
     mesh(BOX, housing, 0, (stemBottom + stemTop) / 2, -bodyDepth / 2, 0.018, stemTop - stemBottom, 0.012, group);
+
+    const hw = (WIDTH + 0.012) / 2, hh = (HEIGHT + 0.012) / 2;
+    this.occluders = [
+      { object: group, points: quad(-hw, hw, -hh, hh) },
+      { object: group, points: quad(-0.009, 0.009, stemBottom, stemTop) }
+    ];
   }
 
   setLight(top: THREE.Color, bottom: THREE.Color, lamp: number, head: number): void {

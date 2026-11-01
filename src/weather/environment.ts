@@ -6,11 +6,12 @@ import type { SceneLights } from '../scene/lights';
 import { LAMP_KINDS, MATERIALS, SIGN_MATERIALS, WINDOW_MATERIALS } from '../scene/materials';
 import type { PostFx } from '../scene/postfx';
 import type { Stage } from '../scene/stage';
+import type { Particles } from './particles';
 import { TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './tables';
 
 const BLEND_RATE = 1.1;
 const COLOR_KEYS = ['top', 'bot', 'fogC', 'sunCol'] as const;
-const NUMBER_KEYS = ['fogD', 'hemi', 'sun', 'win', 'lamp', 'head', 'wet', 'exp', 'bloom', 'star', 'over'] as const;
+const NUMBER_KEYS = ['fogD', 'hemi', 'sun', 'win', 'lamp', 'head', 'wet', 'rain', 'snow', 'exp', 'bloom', 'star', 'over'] as const;
 
 type EnvState = Record<(typeof COLOR_KEYS)[number], THREE.Color> & Record<(typeof NUMBER_KEYS)[number], number>;
 
@@ -28,6 +29,8 @@ function targetState(tod: TimeOfDayId, weather: WeatherId): EnvState {
     lamp: t.lamp,
     head: t.head,
     wet: w.wet,
+    rain: w.rain,
+    snow: w.snow,
     exp: t.exp,
     bloom: t.bloom,
     star: t.star * Math.pow(1 - w.over, 2),
@@ -41,24 +44,40 @@ const ROAD_WET = new THREE.Color(0x111216);
 /** Eases the whole scene towards the selected time of day and weather. */
 export class Environment {
   private state: EnvState | null = null;
+  private target: EnvState | null = null;
+  private targetKey = '';
 
   constructor(
     private readonly stage: Stage,
     private readonly lights: SceneLights,
     private readonly postfx: PostFx,
     private readonly cockpit: Cockpit,
-    private readonly backdrop: Backdrop
+    private readonly backdrop: Backdrop,
+    private readonly particles: Particles
   ) {}
 
   get lampLevel(): number {
     return this.state?.lamp ?? 0;
   }
 
+  get rainLevel(): number {
+    return this.state?.rain ?? 0;
+  }
+
+  get snowLevel(): number {
+    return this.state?.snow ?? 0;
+  }
+
   update(dt: number, tod: TimeOfDayId, weather: WeatherId): void {
-    const target = targetState(tod, weather);
+    const key = `${tod}|${weather}`;
+    if (key !== this.targetKey || !this.target) {
+      this.targetKey = key;
+      this.target = targetState(tod, weather);
+    }
+    const target = this.target;
     if (!this.state) {
-      this.state = target;
-      this.apply(target);
+      this.state = targetState(tod, weather);
+      this.apply(this.state);
       return;
     }
     const k = damp(BLEND_RATE, dt);
@@ -100,5 +119,6 @@ export class Environment {
     MATERIALS.road.color.copy(ROAD_DRY).lerp(ROAD_WET, env.wet);
     MATERIALS.road.roughness = lerp(0.92, 0.5, env.wet);
     this.backdrop.applyEnvironment(env.fogC, env.fogD, env.win, env.star);
+    this.particles.applyEnvironment(env.head);
   }
 }

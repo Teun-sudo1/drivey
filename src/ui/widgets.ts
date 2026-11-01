@@ -37,3 +37,25 @@ export function mountStepper(row: HTMLElement, get: () => number, set: (v: numbe
   wrap.append(button('−', `Decrease ${label}`, -step), value, button('+', `Increase ${label}`, step));
   row.appendChild(wrap);
 }
+
+/** Fills a `.seg` element with one button per option. */
+export function mountSegmented<T extends string>(el: HTMLElement, options: readonly (readonly [value: T, label: string])[], get: () => T, set: (v: T) => void): void {
+  el.setAttribute('role', 'group');
+  const buttons = options.map(([value, label]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.addEventListener('click', () => {
+      set(value);
+      refresh();
+    });
+    el.appendChild(b);
+    return [value, b] as const;
+  });
+  const refresh = (): void => {
+    for (const [value, b] of buttons) {
+      b.classList.toggle('on', get() === value);
+      b.setAttribute('aria-pressed', String(get() === value));
+    }
+  };
+  refresh();
+}

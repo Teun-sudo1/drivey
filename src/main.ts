@@ -26,9 +26,14 @@ import { createHud, phaseName } from './ui/hud';
 import { createIdleFade } from './ui/idle';
 import { bindShortcuts } from './ui/shortcuts';
 import { toast } from './ui/toast';
-import { mountStepper, mountSwitch } from './ui/widgets';
+import { mountSegmented, mountStepper, mountSwitch } from './ui/widgets';
 import { Environment } from './weather/environment';
-import { TIMES_OF_DAY, WEATHERS } from './weather/tables';
+import { Particles } from './weather/particles';
+import { TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './weather/tables';
+import { createWindshield } from './weather/windshield';
+
+const MOBILE_PARTICLES = 1100;
+const DESKTOP_PARTICLES = 2000;
 
 const platform = getPlatform();
 const settings = await SettingsStore.load(platform.storage);
@@ -42,7 +47,9 @@ const cockpit = new Cockpit(stage.camera, route.name);
 const backdrop = new Backdrop(stage.scene, route);
 const pool = new ChunkPool(stage.scene, route);
 const drive = new Drive(stage, pool, backdrop, cockpit, route);
-const environment = new Environment(stage, lights, postfx, cockpit, backdrop);
+const particles = new Particles(stage.scene, matchMedia('(pointer: coarse)').matches ? MOBILE_PARTICLES : DESKTOP_PARTICLES);
+const environment = new Environment(stage, lights, postfx, cockpit, backdrop, particles);
+const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera, cockpit.roof, cockpit.glassOccluders, route.lampTint);
 
 /* Timer */
 const timer = new Pomodoro(() => settings.value);
@@ -72,6 +79,11 @@ bindShortcuts({
   toggleFullscreen,
   toggleHidden: () => idle.toggleHidden()
 });
+
+const options = <T extends string>(table: Record<T, { name: string }>) => (Object.keys(table) as T[]).map(k => [k, table[k].name] as const);
+mountSegmented<TimeOfDayId>($('#segTod'), options(TIMES_OF_DAY), () => settings.value.tod, tod => settings.update({ tod }));
+mountSegmented<WeatherId>($('#segWeather'), options(WEATHERS), () => settings.value.weather, weather => settings.update({ weather }));
+settings.onChange(() => hud.render());
 
 for (const row of document.querySelectorAll<HTMLElement>('.tog')) {
   const key = row.dataset.k as ToggleKey;
@@ -106,5 +118,7 @@ startLoop(dt => {
   environment.update(dt, s.tod, s.weather);
   drive.update(dt, s.breakSlow && timer.phase !== 'focus', s.reduced, environment.lampLevel);
   cockpit.update(dt, drive.speed, drive.bend, drive.clock);
+  particles.update({ dt, speed: drive.speed, clock: drive.clock, rain: environment.rainLevel, snow: environment.snowLevel, reducedMotion: s.reduced });
+  windshield.update({ dt, speed: drive.speed, weather: WEATHERS[s.weather], lamp: environment.lampLevel });
   postfx.render(s.bloom);
 });

@@ -26,7 +26,12 @@ export interface Weather {
   snow: number;
   wet: number;
   dim: number;
+  /** Seconds per wiper sweep; 0 parks them. */
   wipe: number;
+  /** Seconds the wipers rest between sweeps. */
+  wipePause: number;
+  /** Opacity of the haze on the glass. */
+  veil: number;
 }
 
 export const TIMES_OF_DAY: Record<TimeOfDayId, TimeOfDay> = {
@@ -36,9 +41,9 @@ export const TIMES_OF_DAY: Record<TimeOfDayId, TimeOfDay> = {
 };
 
 export const WEATHERS: Record<WeatherId, Weather> = {
-  clear: { name: 'Clear', fog: 0.0035, over: 0, rain: 0, snow: 0, wet: 0, dim: 1, wipe: 0 },
-  rain: { name: 'Rain', fog: 0.008, over: 0.55, rain: 0.5, snow: 0, wet: 0.75, dim: 0.8, wipe: 1.8 },
-  heavy: { name: 'Heavy rain', fog: 0.014, over: 0.85, rain: 1, snow: 0, wet: 1, dim: 0.65, wipe: 1.05 },
-  fog: { name: 'Fog', fog: 0.032, over: 0.9, rain: 0, snow: 0, wet: 0.3, dim: 0.8, wipe: 0 },
-  snow: { name: 'Snow', fog: 0.012, over: 0.8, rain: 0, snow: 1, wet: 0.2, dim: 0.85, wipe: 2.6 }
+  clear: { name: 'Clear', fog: 0.0035, over: 0, rain: 0, snow: 0, wet: 0, dim: 1, wipe: 0, wipePause: 0, veil: 0 },
+  rain: { name: 'Rain', fog: 0.008, over: 0.55, rain: 0.5, snow: 0, wet: 0.75, dim: 0.8, wipe: 1.8, wipePause: 1.4, veil: 0 },
+  heavy: { name: 'Heavy rain', fog: 0.014, over: 0.85, rain: 1, snow: 0, wet: 1, dim: 0.65, wipe: 1.05, wipePause: 0, veil: 0 },
+  fog: { name: 'Fog', fog: 0.032, over: 0.9, rain: 0, snow: 0, wet: 0.3, dim: 0.8, wipe: 0, wipePause: 0, veil: 0.05 },
+  snow: { name: 'Snow', fog: 0.012, over: 0.8, rain: 0, snow: 1, wet: 0.2, dim: 0.85, wipe: 2.6, wipePause: 3, veil: 0 }
 };

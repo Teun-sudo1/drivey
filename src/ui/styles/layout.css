@@ -1,4 +1,5 @@
-#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#gl, #glass { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#glass { pointer-events: none; }
 
 /* Film look */
 #vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(0, 0, 0, .55) 100%); }

@@ -36,7 +36,7 @@ function defaults(): Settings {
   return {
     route: 'city',
     tod: 'night',
-    weather: 'clear',
+    weather: 'rain',
     bloom: true,
     vignette: true,
     grain: true,
