@@ -139,3 +139,8 @@ startLoop(dt => {
   roadSurface.update(environment.wetLevel, environment.snowLevel, environment.headlightLevel);
   postfx.render(s.bloom);
 });
+
+// Lets the browser tests read scene state. Compiled out of the public build.
+if (import.meta.env.MODE === 'e2e') {
+  Object.assign(window, { __drivey: { stage, postfx, pool, cockpit, drive, environment, particles, windshield, roadSurface, timer, settings } });
+}

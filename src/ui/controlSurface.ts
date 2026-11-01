@@ -13,6 +13,8 @@ export function createControlSurface(onToggle: () => void): ControlSurface {
     panel.classList.toggle('hidden', !open);
     // Keeps the off-screen controls out of the tab order.
     panel.inert = !open;
+    // Chrome leaves focus on a button inside the now inert panel, which would swallow key presses.
+    if (!open && panel.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
     onToggle();
   };
 

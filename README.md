@@ -14,7 +14,21 @@ npm run dev        # development server
 npm run build      # typecheck, then production build in dist/
 npm run preview    # serve the production build
 npm test           # unit tests
+npm run test:e2e   # browser tests
 ```
+
+## Tests
+
+`npm run test:e2e` drives the real app in a browser on four setups: phone portrait and phone landscape (WebKit), and laptop (WebKit and Chromium). The first run needs `npx playwright install chromium webkit`. To run one setup or one test:
+
+```sh
+npx playwright test --project=phone-portrait
+npx playwright test -g "wipers"
+```
+
+The tests use a separate build (`npm run build:e2e`) that exposes scene state on `window.__drivey`; the public build doesn't include it. They run on every push, and a failure stops the deploy.
+
+When adding a feature, add its test in `e2e/`, then break the feature on purpose to check that the test fails.
 
 ## Keyboard shortcuts
 
