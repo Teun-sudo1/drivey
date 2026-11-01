@@ -56,8 +56,6 @@ export class Cockpit {
 
     root.add(this.roof);
     mesh(BOX, intB, -0.35, 0.52, -0.82, 2.8, 0.07, 0.55, this.roof);
-    mesh(BOX, intB, -0.33, 0.37, -0.78, 0.28, 0.08, 0.03, this.roof);
-    mesh(BOX, intB, -0.33, 0.45, -0.79, 0.02, 0.1, 0.02, this.roof);
 
     this.dashLight.position.set(0, -0.36, -0.82);
     this.passLight.position.set(-0.2, 0.55, -0.5);
