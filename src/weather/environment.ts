@@ -87,6 +87,7 @@ export class Environment {
     lights.sun.color.copy(env.sunCol);
     lights.headlights.intensity = 170 * env.head + 30 * env.over * (1 - env.head);
     cockpit.dashLight.intensity = 0.03 + 0.1 * env.lamp;
+    cockpit.mirror.setLight(env.top, env.bot, env.lamp, env.head);
     for (const m of WINDOW_MATERIALS) m.emissiveIntensity = env.win;
     for (const m of SIGN_MATERIALS) m.emissiveIntensity = 0.05 + 0.3 * env.lamp;
     MATERIALS.under.color.setRGB(1, 0.85, 0.63).multiplyScalar(0.15 + 1.1 * env.lamp);

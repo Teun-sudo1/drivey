@@ -2,10 +2,12 @@ import * as THREE from 'three';
 import { BOX, mesh } from '../geometry';
 import { createGauges } from './gauges';
 import { createLcd } from './lcd';
+import { Mirror } from './mirror';
 import { createNav } from './nav';
 
 const GAUGE_INTERVAL = 0.1;
 const NAV_INTERVAL = 0.25;
+const MIRROR_HIDDEN_ROOF_Y = 0.2;
 
 /** Low-poly interior, parented to the camera so it never leaves the frame. */
 export class Cockpit {
@@ -13,6 +15,7 @@ export class Cockpit {
   readonly passLight = new THREE.PointLight(0xffffff, 0, 3.5, 1.5);
   readonly roof = new THREE.Group();
   readonly wheel = new THREE.Group();
+  readonly mirror: Mirror;
 
   private readonly gauges = createGauges();
   private readonly lcd = createLcd();
@@ -56,6 +59,7 @@ export class Cockpit {
 
     root.add(this.roof);
     mesh(BOX, intB, -0.35, 0.52, -0.82, 2.8, 0.07, 0.55, this.roof);
+    this.mirror = new Mirror(this.roof, intB);
 
     this.dashLight.position.set(0, -0.36, -0.82);
     this.passLight.position.set(-0.2, 0.55, -0.5);
@@ -65,6 +69,8 @@ export class Cockpit {
   }
 
   update(dt: number, speed: number, bend: number, clock: number): void {
+    // In portrait the roof, and the mirror with it, is framed out of view.
+    if (this.roof.position.y < MIRROR_HIDDEN_ROOF_Y) this.mirror.update(dt, speed, bend);
     this.gaugeTimer += dt;
     if (this.gaugeTimer >= GAUGE_INTERVAL) {
       this.gaugeTimer = 0;
