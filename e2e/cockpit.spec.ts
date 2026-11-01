@@ -65,6 +65,20 @@ test.describe('rear-view mirror', () => {
   });
 });
 
+test('the dashboard display is fully on screen in landscape', async ({ page }) => {
+  test.skip(isPortrait(page), 'portrait crops the dashboard to a strip on purpose');
+  await openApp(page);
+  const edges = await page.evaluate(() => {
+    const { cockpit, stage } = window.__drivey;
+    stage.camera.updateMatrixWorld(true);
+    const lcd = cockpit.screens[1];
+    const width = lcd.geometry.parameters.width;
+    return [-width / 2, width / 2].map(x => lcd.localToWorld(stage.camera.position.clone().set(x, 0, 0)).project(stage.camera).x);
+  });
+  expect(Math.min(...edges)).toBeGreaterThan(-1);
+  expect(Math.max(...edges)).toBeLessThan(1);
+});
+
 test.describe('driving side', () => {
   const state = (page: any) => page.evaluate(() => {
     const { pool, cockpit, roadSurface, windshield, stage } = window.__drivey;

@@ -1,4 +1,4 @@
-import { expect, isPhone, openApp, test } from './support';
+import { advance, expect, isPhone, openApp, test } from './support';
 
 test.describe('timer', () => {
   test('starts, counts down and pauses', async ({ page }) => {
@@ -33,6 +33,8 @@ test.describe('timer', () => {
 
   test('finishing a session announces the break and slows the car', async ({ page }) => {
     await openApp(page);
+    await advance(page, 20);
+    expect(await page.evaluate(() => window.__drivey.drive.speed)).toBeGreaterThan(20);
     await page.click('#btnPlay');
     await page.evaluate(() => {
       const { timer } = window.__drivey;
@@ -42,7 +44,8 @@ test.describe('timer', () => {
     await expect(page.locator('#phaseName')).toHaveText('Short break');
     await expect(page.locator('#toast')).toHaveText('Nice work. Time for a break.');
     await expect(page.locator('#btnPlay')).toHaveAttribute('aria-label', 'Start');
-    await page.waitForFunction(() => window.__drivey.drive.speed < 21.5);
+    await advance(page, 20);
+    expect(await page.evaluate(() => window.__drivey.drive.speed)).toBeLessThan(15);
   });
 
   test('duration edits apply and survive a reload', async ({ page }) => {

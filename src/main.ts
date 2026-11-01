@@ -6,10 +6,11 @@ import './ui/styles/tokens.css';
 import './ui/styles/layout.css';
 import './ui/styles/components.css';
 
+import { Engine } from './app/engine';
 import { startLoop } from './app/loop';
 import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type ToggleKey } from './app/settings';
 import { getPlatform } from './platform';
-import { ROUTES } from './routes';
+import { ROUTES, type RouteId } from './routes';
 import { Backdrop } from './scene/backdrop';
 import { ChunkPool } from './scene/chunkPool';
 import { Cockpit } from './scene/cockpit/cockpit';
@@ -26,6 +27,7 @@ import { toggleFullscreen } from './ui/fullscreen';
 import { createHud, phaseName } from './ui/hud';
 import { createIdleFade } from './ui/idle';
 import { bindShortcuts } from './ui/shortcuts';
+import { createStartScreen } from './ui/startScreen';
 import { toast } from './ui/toast';
 import { mountSegmented, mountStepper, mountSwitch } from './ui/widgets';
 import { Environment } from './weather/environment';
@@ -42,6 +44,7 @@ const settings = await SettingsStore.load(platform.storage);
 
 /* Scene */
 const route = ROUTES[settings.value.route];
+const engine = new Engine();
 const stage = new Stage($<HTMLCanvasElement>('#gl'));
 const postfx = new PostFx(stage);
 const lights = createLights(stage.scene);
@@ -51,6 +54,8 @@ const roadSurface = new RoadSurface(stage, route.lanes);
 const pool = new ChunkPool(stage.scene, route);
 const drive = new Drive(stage, pool, backdrop, cockpit, route);
 const particles = new Particles(stage.scene, matchMedia('(pointer: coarse)').matches ? MOBILE_PARTICLES : DESKTOP_PARTICLES);
+engine.onChange(state => cockpit.setEngine(state));
+const startScreen = createStartScreen(engine);
 const environment = new Environment(stage, lights, postfx, cockpit, backdrop, particles);
 const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera, cockpit.roof, cockpit.glassOccluders, route.lampTint);
 
@@ -80,16 +85,25 @@ $('#btnSkip').addEventListener('click', () => {
 });
 $('#btnFull').addEventListener('click', () => void toggleFullscreen());
 bindShortcuts({
-  togglePlay: () => timer.toggle(),
+  togglePlay: () => {
+    if (engine.running) timer.toggle();
+  },
   toggleFullscreen,
   toggleHidden: () => idle.toggleHidden()
 });
 
 const options = <T extends string>(table: Record<T, { name: string }>) => (Object.keys(table) as T[]).map(k => [k, table[k].name] as const);
-mountSegmented<DriveSide>($('#segSide'), [['left', 'Left'], ['right', 'Right']], () => settings.value.driveSide, driveSide => settings.update({ driveSide }));
-mountSegmented<TimeOfDayId>($('#segTod'), options(TIMES_OF_DAY), () => settings.value.tod, tod => settings.update({ tod }));
-mountSegmented<WeatherId>($('#segWeather'), options(WEATHERS), () => settings.value.weather, weather => settings.update({ weather }));
-settings.onChange(() => hud.render());
+// The same controls appear on the start screen and in settings, so changes refresh both.
+const sceneControls = [
+  mountSegmented<RouteId>($('#startRoute'), options(ROUTES), () => settings.value.route, route => settings.update({ route })),
+  ...[$('#segSide'), $('#startSide')].map(el => mountSegmented<DriveSide>(el, [['left', 'Left'], ['right', 'Right']], () => settings.value.driveSide, driveSide => settings.update({ driveSide }))),
+  ...[$('#segTod'), $('#startTod')].map(el => mountSegmented<TimeOfDayId>(el, options(TIMES_OF_DAY), () => settings.value.tod, tod => settings.update({ tod }))),
+  ...[$('#segWeather'), $('#startWeather')].map(el => mountSegmented<WeatherId>(el, options(WEATHERS), () => settings.value.weather, weather => settings.update({ weather })))
+];
+settings.onChange(() => {
+  hud.render();
+  for (const refresh of sceneControls) refresh();
+});
 
 for (const row of document.querySelectorAll<HTMLElement>('.tog')) {
   const key = row.dataset.k as ToggleKey;
@@ -131,11 +145,12 @@ void Promise.all(['600 15px Inter', '14px Inter', '54px "Share Tech Mono"'].map(
 function simulate(dt: number): void {
   const s = settings.value;
   stage.updateFraming(dt, s.reduced);
-  environment.update(dt, s.tod, s.weather);
-  drive.update(dt, s.breakSlow && timer.phase !== 'focus', s.reduced, environment.lampLevel);
+  const ignitionOn = engine.state === 'on' || engine.state === 'running';
+  environment.update(dt, s.tod, s.weather, ignitionOn);
+  drive.update(dt, engine.state, s.breakSlow && timer.phase !== 'focus', s.reduced, environment.lampLevel);
   cockpit.update(dt, drive.speed, drive.bend, drive.clock);
   particles.update({ dt, speed: drive.speed, clock: drive.clock, rain: environment.rainLevel, snow: environment.snowLevel, reducedMotion: s.reduced });
-  windshield.update({ dt, speed: drive.speed, weather: WEATHERS[s.weather], lamp: environment.lampLevel, mirrored: s.driveSide === 'right' });
+  windshield.update({ dt, speed: drive.speed, weather: WEATHERS[s.weather], lamp: environment.lampLevel, wipersOn: ignitionOn, mirrored: s.driveSide === 'right' });
   roadSurface.setLevels(environment.wetLevel, environment.snowLevel, environment.headlightLevel);
 }
 
@@ -147,5 +162,5 @@ startLoop(dt => {
 
 // Lets the browser tests read scene state. Compiled out of the public build.
 if (import.meta.env.MODE === 'e2e') {
-  Object.assign(window, { __drivey: { simulate, stage, postfx, pool, cockpit, drive, environment, particles, windshield, roadSurface, timer, settings } });
+  Object.assign(window, { __drivey: { simulate, engine, startScreen, stage, postfx, pool, cockpit, drive, environment, particles, windshield, roadSurface, timer, settings } });
 }

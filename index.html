@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#000000">
 <title>Drivey</title>
 </head>
-<body>
+<body class="parked">
 <canvas id="gl" aria-hidden="true"></canvas>
 <canvas id="glass" aria-hidden="true"></canvas>
 <div id="vignette"></div>
@@ -61,6 +61,60 @@
 </div>
 
 <div id="toast" role="status" aria-live="polite"></div>
+
+<div id="start" data-step="setup">
+  <div class="start-card" id="startSetup">
+    <h1>DRIVEY</h1>
+    <p class="start-lead">Set up your drive, then start the engine</p>
+    <div class="start-fields">
+      <div><h4>Route</h4><div class="seg" id="startRoute" aria-label="Route"></div></div>
+      <div><h4>Drive on the</h4><div class="seg" id="startSide" aria-label="Drive on the"></div></div>
+      <div><h4>Time of day</h4><div class="seg" id="startTod" aria-label="Time of day"></div></div>
+      <div><h4>Weather</h4><div class="seg" id="startWeather" aria-label="Weather"></div></div>
+    </div>
+    <button class="start-go" id="btnGetIn">Get in the car</button>
+  </div>
+  <div class="start-key" id="startKey">
+    <button id="ignition" aria-label="Turn the key to start the engine">
+      <svg viewBox="-120 -120 240 240" aria-hidden="true">
+        <defs>
+          <radialGradient id="bezel" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#3a3d44"/><stop offset=".7" stop-color="#16181c"/><stop offset="1" stop-color="#08090b"/></radialGradient>
+          <linearGradient id="chrome" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9dce2"/><stop offset=".45" stop-color="#70747c"/><stop offset=".7" stop-color="#aeb2ba"/><stop offset="1" stop-color="#4a4d54"/></linearGradient>
+          <linearGradient id="fob" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#34363c"/><stop offset=".35" stop-color="#1a1b1f"/><stop offset="1" stop-color="#0c0d0f"/></linearGradient>
+        </defs>
+        <circle r="116" fill="url(#bezel)" stroke="#000" stroke-width="2"/>
+        <path id="startArc" d="M 52.3 -52.3 A 74 74 0 0 1 74 0" fill="none" stroke="#e5502f" stroke-width="4" stroke-linecap="round"/>
+        <g class="key-marks">
+          <g transform="rotate(-45)"><path d="M0 -84V-74"/><text y="-92">LOCK</text></g>
+          <g><path d="M0 -84V-74"/><text y="-92">ACC</text></g>
+          <g transform="rotate(45)"><path d="M0 -84V-74"/><text y="-92">ON</text></g>
+          <g transform="rotate(90)" class="key-start"><path d="M0 -84V-74"/><text y="-92">START</text></g>
+        </g>
+        <circle r="66" fill="url(#chrome)"/>
+        <circle r="56" fill="#0d0e11"/>
+        <circle r="24" fill="url(#chrome)"/>
+        <circle r="18" fill="#17181c"/>
+        <g id="keyBody">
+          <rect x="-7" y="-26" width="14" height="40" rx="2" fill="url(#chrome)" stroke="#2a2c31" stroke-width="1"/>
+          <path d="M-7 -8H7M-7 0H7" stroke="#55585f" stroke-width="1.5"/>
+          <path d="M-13 -22 C-16 -30 -33 -36 -33 -56 C-33 -74 -18 -84 0 -84 C18 -84 33 -74 33 -56 C33 -36 16 -30 13 -22 Z" fill="url(#fob)" stroke="#000" stroke-width="1.5"/>
+          <path d="M-25 -58 C-25 -70 -14 -78 -4 -78" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".12"/>
+          <path d="M-13 -40H13M-11 -33H11" stroke="#3b3d44" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cy="-66" r="6.5" fill="#050506" stroke="#6a6d74" stroke-width="2"/>
+        </g>
+        <g id="keyTag">
+          <circle cy="9" r="9" fill="none" stroke="url(#chrome)" stroke-width="2.5"/>
+          <rect x="-14" y="17" width="28" height="44" rx="7" fill="#5a2f1c" stroke="#2a140a" stroke-width="1.5"/>
+          <rect x="-10" y="21" width="20" height="36" rx="4.5" fill="none" stroke="#c99a72" stroke-width="1" stroke-dasharray="3 2.5" opacity=".8"/>
+          <circle cy="23" r="2.5" fill="url(#chrome)"/>
+        </g>
+      </svg>
+    </button>
+    <p class="start-status" id="ignitionStatus" role="status" aria-live="polite">Turn the key</p>
+    <p class="note">Drag the key to START and hold it, or tap it</p>
+    <button class="start-back" id="btnBack">Back to setup</button>
+  </div>
+</div>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

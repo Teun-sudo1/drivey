@@ -11,6 +11,8 @@ export interface WindshieldFrame {
   weather: Weather;
   /** Blended 0 to 1 streetlight level. */
   lamp: number;
+  /** Wipers only run with the ignition on. */
+  wipersOn: boolean;
   /** Mirrors the wipers for a left-hand-drive car. */
   mirrored: boolean;
 }
@@ -123,13 +125,13 @@ class CanvasWindshield implements Windshield {
     this.ctx = ctx;
   }
 
-  update({ dt, speed, weather, lamp, mirrored }: WindshieldFrame): void {
+  update({ dt, speed, weather, lamp, wipersOn, mirrored }: WindshieldFrame): void {
     this.mirrored = mirrored;
     this.syncSize();
     this.measureGlass();
     this.spawn(dt, weather, lamp);
     this.age(dt, speed, weather);
-    this.moveWipers(dt, weather);
+    this.moveWipers(dt, weather, wipersOn);
     this.veil = lerp(this.veil, weather.veil, damp(VEIL_RATE, dt));
     this.draw();
   }
@@ -214,9 +216,9 @@ class CanvasWindshield implements Windshield {
     return Math.min(this.width * widthShare, this.bottom * 1.02);
   }
 
-  private moveWipers(dt: number, w: Weather): void {
+  private moveWipers(dt: number, w: Weather, wipersOn: boolean): void {
     // When the weather clears, a blade mid-sweep finishes its stroke instead of snapping home.
-    if (w.wipe > 0) this.wiperPeriod = w.wipe;
+    if (wipersOn && w.wipe > 0) this.wiperPeriod = w.wipe;
     else if (this.wiperPhase === 0) this.wiperPeriod = 0;
     if (this.wiperPeriod === 0) return;
 

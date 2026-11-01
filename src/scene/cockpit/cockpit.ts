@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import type { EngineState } from '../../app/engine';
+import { damp, lerp } from '../../lib/math';
 import { hideFromReflection } from '../roadSurface';
 import { BOX, mesh } from '../geometry';
 import { createGauges } from './gauges';
@@ -8,6 +10,12 @@ import { createNav } from './nav';
 
 const GAUGE_INTERVAL = 0.1;
 const NAV_INTERVAL = 0.25;
+const SWEEP_SECONDS = 1.2;
+/** Far enough in that the display stays fully on screen at a 16:10 laptop's aspect ratio. */
+const LCD_X = -0.58;
+const SCREEN_POWER_RATE = 6;
+/** Full brightness of the gauges, LCD and nav screen. */
+const SCREEN_LEVELS = [1, 1, 0.73];
 
 /** Part of the interior that sits in front of the windshield, as a polygon local to `object`. */
 export interface GlassOccluder {
@@ -28,6 +36,9 @@ export class Cockpit {
   private readonly root = new THREE.Group();
   private readonly screens: THREE.Mesh[];
   private side = 1;
+  private engine: EngineState = 'off';
+  private power = 0;
+  private sweepLeft = 0;
   private readonly gauges = createGauges();
   private readonly lcd = createLcd();
   private readonly nav = createNav();
@@ -49,17 +60,17 @@ export class Cockpit {
     mesh(BOX, intB, 0, -0.285, -0.95, 0.58, 0.04, 0.14, root).rotation.x = 0.18;
     mesh(BOX, intB, 0, -0.4, -0.92, 0.58, 0.19, 0.05, root);
 
-    const screen = (texture: THREE.Texture, color = 0xffffff) => new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, color });
+    const screen = (texture: THREE.Texture) => new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, color: 0x000000 });
     const gaugeScreen = mesh(new THREE.PlaneGeometry(0.5, 0.164), screen(this.gauges.texture), 0, -0.4, -0.893, 1, 1, 1, root);
-    mesh(BOX, intB, -0.64, -0.435, -0.98, 0.37, 0.1, 0.14, root);
-    const lcdScreen = mesh(new THREE.PlaneGeometry(0.31, 0.0775), screen(this.lcd.texture), -0.64, -0.435, -0.909, 1, 1, 1, root);
+    mesh(BOX, intB, LCD_X, -0.435, -0.98, 0.37, 0.1, 0.14, root);
+    const lcdScreen = mesh(new THREE.PlaneGeometry(0.31, 0.0775), screen(this.lcd.texture), LCD_X, -0.435, -0.909, 1, 1, 1, root);
 
     const navUnit = new THREE.Group();
     navUnit.position.set(0.5, -0.25, -0.86);
     navUnit.rotation.y = -0.35;
     root.add(navUnit);
     mesh(BOX, intB, 0, 0, -0.012, 0.2, 0.29, 0.02, navUnit);
-    const navScreen = mesh(new THREE.PlaneGeometry(0.18, 0.27), screen(this.nav.texture, 0xbbbbbb), 0, 0, 0, 1, 1, 1, navUnit);
+    const navScreen = mesh(new THREE.PlaneGeometry(0.18, 0.27), screen(this.nav.texture), 0, 0, 0, 1, 1, 1, navUnit);
     this.screens = [gaugeScreen, lcdScreen, navScreen];
 
     this.wheel.position.set(0, -0.47, -0.6);
@@ -100,13 +111,26 @@ export class Cockpit {
     this.wheel.rotation.z = bend * 900 * this.side;
   }
 
+  /** Screens light with the ignition, and at ON the needles sweep their full travel, like a real self-test. */
+  setEngine(state: EngineState): void {
+    if (state === 'on' && this.engine !== 'cranking' && this.engine !== 'running') this.sweepLeft = SWEEP_SECONDS;
+    this.engine = state;
+  }
+
   update(dt: number, speed: number, bend: number, clock: number): void {
     this.mirror.update(dt, speed, bend);
+    const power = lerp(this.power, this.engine === 'off' ? 0 : 1, damp(SCREEN_POWER_RATE, dt));
+    if (power !== this.power) {
+      this.power = power;
+      this.screens.forEach((s, i) => (s.material as THREE.MeshBasicMaterial).color.setScalar(power * SCREEN_LEVELS[i]));
+    }
+    this.sweepLeft = Math.max(0, this.sweepLeft - dt);
     this.gaugeTimer += dt;
     if (this.gaugeTimer >= GAUGE_INTERVAL) {
       this.gaugeTimer = 0;
+      const sweep = Math.sin(Math.PI * (this.sweepLeft / SWEEP_SECONDS));
       const kmh = speed * 3.6;
-      this.gauges.draw(kmh, 1.1 + kmh / 45 + Math.sin(clock * 3) * 0.03);
+      this.gauges.draw(Math.max(kmh, sweep * 180), this.rpm(kmh, sweep, clock));
     }
     this.navTimer += dt;
     if (this.navTimer >= NAV_INTERVAL) {
@@ -128,6 +152,12 @@ export class Cockpit {
     this.lcdKey = '';
     this.gaugeTimer = GAUGE_INTERVAL;
     this.navTimer = NAV_INTERVAL;
+  }
+
+  private rpm(kmh: number, sweep: number, clock: number): number {
+    if (this.engine === 'running') return 1.1 + kmh / 45 + Math.sin(clock * 3) * 0.03;
+    if (this.engine === 'cranking') return 0.5 + Math.abs(Math.sin(clock * 22)) * 0.5;
+    return sweep * 8;
   }
 
   private addPillars(root: THREE.Group, material: THREE.Material): void {

@@ -54,21 +54,19 @@ roughnessFactor = mix(mix(roughnessFactor, 0.2, wetMask), 0.85, snowMask);
 `;
 
 /* Sampled in a vertical smear, because rough wet asphalt stretches lights
-   towards the viewer. The jitter stops thin lights splitting into a ladder of
-   bands; it has to be per-pixel, as anything coarser turns high-contrast edges
-   like the barrier into visible blocks. */
+   towards the viewer. The samples sit close together so thin lights don't split
+   into a ladder of bands. Jittering them instead shows up as blocks, hatching or
+   sand on bright reflections, depending on the noise. */
 const REFLECTION_GLSL = `
 if (wetMask > 0.001) {
   vec2 reflectionUv = vReflection.xy / vReflection.w;
   // Fades with distance, where the road's noise is too fine and would alias into a zigzag.
   reflectionUv.x += (roadNoise - 0.5) * 0.02 * clamp(4.0 / length(vViewPosition), 0.0, 1.0);
-  float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
   vec3 reflected = vec3(0.0);
-  for (int i = -3; i <= 3; i++) {
-    float offset = (float(i) + jitter - 0.5) * 0.008;
-    reflected += texture2D(tReflection, reflectionUv + vec2(0.0, offset)).rgb * (4.0 - abs(float(i)));
+  for (int i = -4; i <= 4; i++) {
+    reflected += texture2D(tReflection, reflectionUv + vec2(0.0, float(i) * 0.005)).rgb * (5.0 - abs(float(i)));
   }
-  reflected /= 16.0;
+  reflected /= 25.0;
   float facing = clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0);
   float fresnel = mix(0.1, 1.0, pow(1.0 - facing, 5.0));
   // Capped so the lamp overhead can't wash the whole road near the car.

@@ -45,3 +45,40 @@ h4 { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: v
 .num .st { display: flex; align-items: center; gap: 10px; }
 .num .st button { width: 30px; height: 30px; border-radius: 8px; background: rgba(255, 255, 255, .07); border: 1px solid var(--line); }
 .num .st span { min-width: 30px; text-align: center; font-family: var(--mono); font-size: 16px; }
+
+.start-card {
+  width: min(420px, 100%); padding: 22px; border-radius: 22px;
+  background: rgba(10, 12, 17, .8); border: 1px solid var(--line);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+}
+.start-card h1 { font-family: var(--mono); font-weight: 400; font-size: 34px; letter-spacing: .1em; color: #ffd8b0; text-shadow: 0 0 24px rgba(255, 160, 80, .4); }
+.start-lead { color: var(--mut); font-size: 14px; margin-top: 2px; }
+.start-go {
+  display: block; width: 100%; margin-top: 20px; padding: 13px; border-radius: 99px;
+  background: var(--acc); color: #1a1206; font-weight: 600; font-size: 15px;
+}
+
+.start-key { display: flex; flex-direction: column; align-items: center; text-align: center; }
+#ignition { width: min(48vh, 76vw, 300px); aspect-ratio: 1; border-radius: 50%; touch-action: none; cursor: grab; filter: drop-shadow(0 12px 30px rgba(0, 0, 0, .7)); }
+#ignition:active { cursor: grabbing; }
+#ignition svg { display: block; width: 100%; height: 100%; }
+#keyBody { transform: rotate(-45deg); transform-origin: 0 0; }
+#keyTag { pointer-events: none; }
+.key-marks path { stroke: #c9ced8; stroke-width: 2.5; }
+.key-marks text { fill: #c9ced8; font: 600 11px Inter, sans-serif; letter-spacing: .08em; text-anchor: middle; }
+.key-start path { stroke: #ff6a45; }
+.key-start text { fill: #ff6a45; }
+.start-status { margin-top: 12px; font-family: var(--mono); font-size: 18px; color: #ffd8b0; min-height: 1.3em; }
+.start-key .note { margin-top: 4px; color: rgba(233, 237, 245, .7); }
+.start-back { margin-top: 10px; padding: 8px 14px; font-size: 13px; color: var(--mut); }
+
+/* Short screens, like a phone on its side: everything has to fit without scrolling. */
+@media (max-height: 480px) {
+  .start-card { width: min(680px, 100%); padding: 12px 18px; }
+  .start-card h1 { font-size: 22px; display: inline; }
+  .start-lead { display: inline; margin-left: 10px; font-size: 13px; }
+  .start-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .start-card h4 { margin: 8px 0 5px; }
+  .start-card .seg button { padding: 6px 10px; }
+  .start-go { margin-top: 10px; padding: 9px; }
+}

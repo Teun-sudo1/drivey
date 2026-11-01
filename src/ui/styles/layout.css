@@ -77,3 +77,22 @@ body.idle { cursor: none; }
   opacity: 0; transition: .35s; pointer-events: none;
 }
 #toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+/* Parked: nothing but the start screen until the engine runs */
+body.parked #hud { visibility: hidden; }
+
+#start {
+  position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; overflow-y: auto;
+  padding: calc(16px + var(--st)) calc(16px + var(--sr)) calc(16px + var(--sb)) calc(16px + var(--sl));
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, .3), rgba(0, 0, 0, .78));
+  transition: opacity .9s;
+}
+#start.gone { opacity: 0; pointer-events: none; }
+#start[data-step="setup"] #startKey, #start[data-step="key"] #startSetup { display: none; }
+#start.cranking #ignition svg { animation: crank .09s linear infinite; }
+body.reduced #start.cranking #ignition svg { animation: none; }
+@keyframes crank {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-1.5px, 1px); }
+  75% { transform: translate(1.5px, -1px); }
+}

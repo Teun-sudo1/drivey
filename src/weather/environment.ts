@@ -11,11 +11,11 @@ import { TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './tabl
 
 const BLEND_RATE = 1.1;
 const COLOR_KEYS = ['top', 'bot', 'fogC', 'sunCol'] as const;
-const NUMBER_KEYS = ['fogD', 'hemi', 'sun', 'win', 'lamp', 'head', 'wet', 'rain', 'snow', 'exp', 'bloom', 'star', 'over'] as const;
+const NUMBER_KEYS = ['fogD', 'hemi', 'sun', 'win', 'lamp', 'head', 'wet', 'rain', 'snow', 'exp', 'bloom', 'star', 'over', 'power'] as const;
 
 type EnvState = Record<(typeof COLOR_KEYS)[number], THREE.Color> & Record<(typeof NUMBER_KEYS)[number], number>;
 
-function targetState(tod: TimeOfDayId, weather: WeatherId): EnvState {
+function targetState(tod: TimeOfDayId, weather: WeatherId, power: number): EnvState {
   const t = TIMES_OF_DAY[tod], w = WEATHERS[weather], over = new THREE.Color(t.over);
   return {
     top: new THREE.Color(t.top).lerp(over, w.over),
@@ -34,7 +34,8 @@ function targetState(tod: TimeOfDayId, weather: WeatherId): EnvState {
     exp: t.exp,
     bloom: t.bloom,
     star: t.star * Math.pow(1 - w.over, 2),
-    over: w.over
+    over: w.over,
+    power
   };
 }
 
@@ -80,15 +81,17 @@ export class Environment {
     return this.state?.snow ?? 0;
   }
 
-  update(dt: number, tod: TimeOfDayId, weather: WeatherId): void {
-    const key = `${tod}|${weather}`;
+  /** `carLights` is whether the ignition is on, which the headlights and dash glow depend on. */
+  update(dt: number, tod: TimeOfDayId, weather: WeatherId, carLights: boolean): void {
+    const power = carLights ? 1 : 0;
+    const key = `${tod}|${weather}|${power}`;
     if (key !== this.targetKey || !this.target) {
       this.targetKey = key;
-      this.target = targetState(tod, weather);
+      this.target = targetState(tod, weather, power);
     }
     const target = this.target;
     if (!this.state) {
-      this.state = targetState(tod, weather);
+      this.state = targetState(tod, weather, power);
       this.apply(this.state);
       return;
     }
@@ -116,8 +119,8 @@ export class Environment {
     lights.hemi.intensity = env.hemi;
     lights.sun.intensity = env.sun;
     lights.sun.color.copy(env.sunCol);
-    lights.headlights.intensity = 170 * env.head + 30 * env.over * (1 - env.head);
-    cockpit.dashLight.intensity = 0.03 + 0.1 * env.lamp;
+    lights.headlights.intensity = (170 * env.head + 30 * env.over * (1 - env.head)) * env.power;
+    cockpit.dashLight.intensity = (0.03 + 0.1 * env.lamp) * env.power;
     cockpit.mirror.setEnvironment(env);
     const daylight = 1 - Math.min(1, env.win);
     WINDOW_MATERIALS.forEach((m, i) => {
