@@ -19,13 +19,21 @@ export class ChunkPool {
 
   constructor(scene: THREE.Scene, route: RouteDefinition) {
     for (let i = 0; i < CHUNK_COUNT; i++) {
-      const chunk: Chunk = { group: new THREE.Group(), lamps: [], extras: [], buildings: [] };
+      const chunk: Chunk = { group: new THREE.Group(), lamps: [], extras: [], buildings: [], labels: [] };
       route.buildChunk(chunk, i);
       chunk.group.position.z = CHUNK_LENGTH - i * CHUNK_LENGTH;
       bendTree(chunk.group);
       this.refresh(chunk);
       scene.add(chunk.group);
       this.chunks.push(chunk);
+    }
+  }
+
+  /** 1 keeps the road as built, with traffic on the left; -1 mirrors it for driving on the right. */
+  setSide(side: number): void {
+    for (const chunk of this.chunks) {
+      chunk.group.scale.x = side;
+      for (const label of chunk.labels) label.scale.x = Math.abs(label.scale.x) * side;
     }
   }
 

@@ -6,6 +6,11 @@ export interface SceneLights {
   headlights: THREE.SpotLight;
 }
 
+export function setLightsSide(lights: SceneLights, side: number): void {
+  lights.headlights.position.x = -0.4 * side;
+  lights.headlights.target.position.x = -0.6 * side;
+}
+
 export function createLights(scene: THREE.Scene): SceneLights {
   const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x202024, 0.3);
   const sun = new THREE.DirectionalLight(0xffffff, 1);

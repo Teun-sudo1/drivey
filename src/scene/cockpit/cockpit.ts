@@ -25,6 +25,9 @@ export class Cockpit {
   readonly mirror: Mirror;
   readonly glassOccluders: GlassOccluder[];
 
+  private readonly root = new THREE.Group();
+  private readonly screens: THREE.Mesh[];
+  private side = 1;
   private readonly gauges = createGauges();
   private readonly lcd = createLcd();
   private readonly nav = createNav();
@@ -34,7 +37,7 @@ export class Cockpit {
   private lcdKey = '';
 
   constructor(camera: THREE.Camera, private readonly routeName: string) {
-    const root = new THREE.Group();
+    const root = this.root;
     camera.add(root);
 
     const intA = new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.85 });
@@ -47,16 +50,17 @@ export class Cockpit {
     mesh(BOX, intB, 0, -0.4, -0.92, 0.58, 0.19, 0.05, root);
 
     const screen = (texture: THREE.Texture, color = 0xffffff) => new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, color });
-    mesh(new THREE.PlaneGeometry(0.5, 0.164), screen(this.gauges.texture), 0, -0.4, -0.893, 1, 1, 1, root);
+    const gaugeScreen = mesh(new THREE.PlaneGeometry(0.5, 0.164), screen(this.gauges.texture), 0, -0.4, -0.893, 1, 1, 1, root);
     mesh(BOX, intB, -0.64, -0.435, -0.98, 0.37, 0.1, 0.14, root);
-    mesh(new THREE.PlaneGeometry(0.31, 0.0775), screen(this.lcd.texture), -0.64, -0.435, -0.909, 1, 1, 1, root);
+    const lcdScreen = mesh(new THREE.PlaneGeometry(0.31, 0.0775), screen(this.lcd.texture), -0.64, -0.435, -0.909, 1, 1, 1, root);
 
     const navUnit = new THREE.Group();
     navUnit.position.set(0.5, -0.25, -0.86);
     navUnit.rotation.y = -0.35;
     root.add(navUnit);
     mesh(BOX, intB, 0, 0, -0.012, 0.2, 0.29, 0.02, navUnit);
-    mesh(new THREE.PlaneGeometry(0.18, 0.27), screen(this.nav.texture, 0xbbbbbb), 0, 0, 0, 1, 1, 1, navUnit);
+    const navScreen = mesh(new THREE.PlaneGeometry(0.18, 0.27), screen(this.nav.texture, 0xbbbbbb), 0, 0, 0, 1, 1, 1, navUnit);
+    this.screens = [gaugeScreen, lcdScreen, navScreen];
 
     this.wheel.position.set(0, -0.47, -0.6);
     this.wheel.rotation.x = -0.35;
@@ -82,6 +86,18 @@ export class Cockpit {
       { object: navUnit, points: [V(-0.1, -0.145, 0), V(0.1, -0.145, 0), V(0.1, 0.145, 0), V(-0.1, 0.145, 0)] },
       { object: root, points: [V(-0.29, -0.265, -1.02), V(0.29, -0.265, -1.02), V(0.29, -0.5, -0.9), V(-0.29, -0.5, -0.9)] }
     ];
+  }
+
+  /** 1 is the right-hand-drive interior as built; -1 mirrors it for a left-hand-drive car. */
+  setSide(side: number): void {
+    this.side = side;
+    this.root.scale.x = side;
+    for (const s of this.screens) s.scale.x = side;
+  }
+
+  /** Mirroring the interior would otherwise turn the wheel the wrong way. */
+  steer(bend: number): void {
+    this.wheel.rotation.z = bend * 900 * this.side;
   }
 
   update(dt: number, speed: number, bend: number, clock: number): void {

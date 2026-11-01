@@ -7,14 +7,14 @@ import './ui/styles/layout.css';
 import './ui/styles/components.css';
 
 import { startLoop } from './app/loop';
-import { DURATION_LIMITS, SettingsStore, type DurationKey, type ToggleKey } from './app/settings';
+import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type ToggleKey } from './app/settings';
 import { getPlatform } from './platform';
 import { ROUTES } from './routes';
 import { Backdrop } from './scene/backdrop';
 import { ChunkPool } from './scene/chunkPool';
 import { Cockpit } from './scene/cockpit/cockpit';
 import { Drive } from './scene/drive';
-import { createLights } from './scene/lights';
+import { createLights, setLightsSide } from './scene/lights';
 import { PostFx } from './scene/postfx';
 import { RoadSurface } from './scene/roadSurface';
 import { Stage } from './scene/stage';
@@ -86,6 +86,7 @@ bindShortcuts({
 });
 
 const options = <T extends string>(table: Record<T, { name: string }>) => (Object.keys(table) as T[]).map(k => [k, table[k].name] as const);
+mountSegmented<DriveSide>($('#segSide'), [['left', 'Left'], ['right', 'Right']], () => settings.value.driveSide, driveSide => settings.update({ driveSide }));
 mountSegmented<TimeOfDayId>($('#segTod'), options(TIMES_OF_DAY), () => settings.value.tod, tod => settings.update({ tod }));
 mountSegmented<WeatherId>($('#segWeather'), options(WEATHERS), () => settings.value.weather, weather => settings.update({ weather }));
 settings.onChange(() => hud.render());
@@ -111,6 +112,16 @@ function applyBodyFlags(): void {
 settings.onChange(applyBodyFlags);
 applyBodyFlags();
 
+function applyDriveSide(): void {
+  const side = settings.value.driveSide === 'right' ? -1 : 1;
+  pool.setSide(side);
+  cockpit.setSide(side);
+  roadSurface.setSide(side);
+  setLightsSide(lights, side);
+}
+settings.onChange(applyDriveSide);
+applyDriveSide();
+
 // Canvas text drawn before the web fonts arrive falls back to system fonts.
 void Promise.all(['600 15px Inter', '14px Inter', '54px "Share Tech Mono"'].map(font => document.fonts.load(font))).then(() => {
   cockpit.invalidateText();
@@ -124,7 +135,7 @@ startLoop(dt => {
   drive.update(dt, s.breakSlow && timer.phase !== 'focus', s.reduced, environment.lampLevel);
   cockpit.update(dt, drive.speed, drive.bend, drive.clock);
   particles.update({ dt, speed: drive.speed, clock: drive.clock, rain: environment.rainLevel, snow: environment.snowLevel, reducedMotion: s.reduced });
-  windshield.update({ dt, speed: drive.speed, weather: WEATHERS[s.weather], lamp: environment.lampLevel });
+  windshield.update({ dt, speed: drive.speed, weather: WEATHERS[s.weather], lamp: environment.lampLevel, mirrored: s.driveSide === 'right' });
   roadSurface.update(environment.wetLevel, environment.snowLevel, environment.headlightLevel);
   postfx.render(s.bloom);
 });

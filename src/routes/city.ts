@@ -39,7 +39,7 @@ function buildChunk(chunk: Chunk, i: number): void {
     chunk.extras.push({ object: o, probability: 0.5 });
     mesh(BOX, M.metal, 5.6, 3, -26, 0.2, 6, 0.2, o);
     mesh(BOX, M.metal, 4.3, 5.9, -26, 2.8, 0.15, 0.15, o);
-    mesh(PLANE, pick(SIGN_MATERIALS), 3.6, 5.1, -25.9, 3.4, 1.7, 1, o);
+    chunk.labels.push(mesh(PLANE, pick(SIGN_MATERIALS), 3.6, 5.1, -25.9, 3.4, 1.7, 1, o));
   }
 }
 

@@ -90,6 +90,7 @@ export class RoadSurface {
   private readonly reflectionMatrix = new THREE.Matrix4();
   private readonly wet = { value: 0 };
   private readonly snow = { value: 0 };
+  private readonly laneCentres = { value: new THREE.Vector2() };
   private readonly snowAlbedo = { value: SNOW_ALBEDO_DAY };
   private renderThisFrame = true;
 
@@ -101,7 +102,7 @@ export class RoadSurface {
   private readonly clip = new THREE.Vector4();
   private readonly q = new THREE.Vector4();
 
-  constructor(private readonly stage: Stage, lanes: readonly [number, number]) {
+  constructor(private readonly stage: Stage, private readonly lanes: readonly [number, number]) {
     const road = MATERIALS.road;
     road.onBeforeCompile = sh => {
       sh.uniforms.uReflectionMatrix = { value: this.reflectionMatrix };
@@ -110,7 +111,7 @@ export class RoadSurface {
       sh.uniforms.uWet = this.wet;
       sh.uniforms.uSnow = this.snow;
       sh.uniforms.uSnowAlbedo = this.snowAlbedo;
-      sh.uniforms.uLanes = { value: new THREE.Vector2(lanes[0], lanes[1]) };
+      sh.uniforms.uLanes = this.laneCentres;
       sh.vertexShader = VERTEX_HEADER + sh.vertexShader.replace(
         'gl_Position = projectionMatrix * mvPosition;',
         'gl_Position = projectionMatrix * mvPosition;\nvReflection = uReflectionMatrix * bw;\nvRoad = vec2((modelMatrix * vec4(transformed, 1.0)).x, uv.y);'
@@ -127,6 +128,10 @@ export class RoadSurface {
       const scale = Math.min(REFLECTION_SHORT_SIDE / Math.min(w, h), REFLECTION_LONG_SIDE / Math.max(w, h), 1);
       this.target.setSize(Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
     });
+  }
+
+  setSide(side: number): void {
+    this.laneCentres.value.set(this.lanes[0] * side, this.lanes[1] * side);
   }
 
   /** Renders the reflection every other frame; a slight lag doesn't show in a blurred, wet road. */

@@ -11,6 +11,8 @@ export interface WindshieldFrame {
   weather: Weather;
   /** Blended 0 to 1 streetlight level. */
   lamp: number;
+  /** Mirrors the wipers for a left-hand-drive car. */
+  mirrored: boolean;
 }
 
 /** The glass layer. Canvas today; a shader version would only need to implement this. */
@@ -32,6 +34,12 @@ interface Drop {
 const MAX_DROPS = 420;
 const WIPER_PARKED = 3.02;
 const WIPER_FAR = 0.55;
+/** Blade length as a share of the screen's width. */
+const LANDSCAPE_WIPER_REACH = 0.45;
+const PORTRAIT_WIPER_REACH = 0.98;
+/** Stroke widths as a share of the blade's length. */
+const WIPER_ARM_WIDTH = 0.011;
+const WIPER_BLADE_WIDTH = 0.0067;
 /** How fast drops dry off once it has stopped raining. */
 const DRY_RATE = 0.15;
 const FLAKE_MELT_RATE = 0.06;
@@ -101,6 +109,7 @@ class CanvasWindshield implements Windshield {
   private wiperPeriod = 0;
   private wiperMotion = 0;
   private wetGlass = false;
+  private mirrored = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -114,7 +123,8 @@ class CanvasWindshield implements Windshield {
     this.ctx = ctx;
   }
 
-  update({ dt, speed, weather, lamp }: WindshieldFrame): void {
+  update({ dt, speed, weather, lamp, mirrored }: WindshieldFrame): void {
+    this.mirrored = mirrored;
     this.syncSize();
     this.measureGlass();
     this.spawn(dt, weather, lamp);
@@ -199,7 +209,9 @@ class CanvasWindshield implements Windshield {
   }
 
   private get wiperLength(): number {
-    return Math.min(this.width * 0.45, this.bottom * 1.02);
+    // Tall glass needs blades long relative to its width, or they only clear the bottom of it.
+    const widthShare = this.height > this.width ? PORTRAIT_WIPER_REACH : LANDSCAPE_WIPER_REACH;
+    return Math.min(this.width * widthShare, this.bottom * 1.02);
   }
 
   private moveWipers(dt: number, w: Weather): void {
@@ -229,7 +241,7 @@ class CanvasWindshield implements Windshield {
     const L = this.wiperLength, pivots = this.wiperPivots;
     this.drops = this.drops.filter(d => {
       for (const [px, py] of pivots) {
-        const dx = d.x - px, dy = py - d.y, dist = Math.hypot(dx, dy);
+        const dx = (this.mirrored ? this.width - d.x : d.x) - px, dy = py - d.y, dist = Math.hypot(dx, dy);
         if (dist < L && dist > L * 0.1) {
           const phi = Math.atan2(dy, dx);
           if (phi >= lo - 0.02 && phi <= hi + 0.02) return false;
@@ -254,6 +266,10 @@ class CanvasWindshield implements Windshield {
       g.drawImage(d.sprite, d.x - d.r, d.y - d.r, d.r * 2, d.r * 2);
     }
     g.globalAlpha = 1;
+    if (this.mirrored) {
+      g.translate(this.width, 0);
+      g.scale(-1, 1);
+    }
     this.drawSmear();
     if (this.wiperAngle !== WIPER_PARKED || this.wiperPeriod > 0) this.drawWipers();
     g.restore();
@@ -320,17 +336,17 @@ class CanvasWindshield implements Windshield {
   }
 
   private drawWipers(): void {
-    const g = this.ctx, th = this.wiperAngle, L = this.wiperLength, W = this.width;
+    const g = this.ctx, th = this.wiperAngle, L = this.wiperLength;
     const cos = Math.cos(th), sin = Math.sin(th);
     for (const [px, py] of this.wiperPivots) {
       g.strokeStyle = '#060607';
       g.lineCap = 'round';
-      g.lineWidth = Math.max(4, W * 0.005);
+      g.lineWidth = Math.max(5, L * WIPER_ARM_WIDTH);
       g.beginPath();
       g.moveTo(px, py);
       g.lineTo(px + cos * L * 0.9, py - sin * L * 0.9);
       g.stroke();
-      g.lineWidth = Math.max(2.5, W * 0.003);
+      g.lineWidth = Math.max(3.5, L * WIPER_BLADE_WIDTH);
       const ox = Math.cos(th + Math.PI / 2) * 4, oy = -Math.sin(th + Math.PI / 2) * 4;
       g.beginPath();
       g.moveTo(px + cos * L * 0.15 + ox, py - sin * L * 0.15 + oy);

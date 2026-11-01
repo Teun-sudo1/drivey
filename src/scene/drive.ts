@@ -63,6 +63,6 @@ export class Drive {
     );
     this.cockpit.roof.position.y = framing.roofY;
     this.cockpit.mirror.place(framing);
-    this.cockpit.wheel.rotation.z = this.bend * 900;
+    this.cockpit.steer(this.bend);
   }
 }

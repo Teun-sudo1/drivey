@@ -3,8 +3,11 @@ import type { KeyValueStorage } from '../platform/types';
 import { ROUTES, type RouteId } from '../routes';
 import { TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from '../weather/tables';
 
+export type DriveSide = 'left' | 'right';
+
 export interface Settings {
   route: RouteId;
+  driveSide: DriveSide;
   tod: TimeOfDayId;
   weather: WeatherId;
   bloom: boolean;
@@ -35,6 +38,7 @@ const STORAGE_KEY = 'nd.settings';
 function defaults(): Settings {
   return {
     route: 'city',
+    driveSide: 'left',
     tod: 'night',
     weather: 'rain',
     bloom: true,
@@ -57,6 +61,7 @@ function sanitize(stored: unknown): Settings {
   const raw = stored as Partial<Record<keyof Settings, unknown>>;
   const isKeyOf = <T extends object>(table: T, v: unknown): v is keyof T => typeof v === 'string' && Object.hasOwn(table, v);
   if (isKeyOf(ROUTES, raw.route)) s.route = raw.route;
+  if (raw.driveSide === 'left' || raw.driveSide === 'right') s.driveSide = raw.driveSide;
   if (isKeyOf(TIMES_OF_DAY, raw.tod)) s.tod = raw.tod;
   if (isKeyOf(WEATHERS, raw.weather)) s.weather = raw.weather;
   for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow'] as const) {

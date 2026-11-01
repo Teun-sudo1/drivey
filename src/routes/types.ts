@@ -16,6 +16,8 @@ export interface Chunk {
   lamps: LampSpot[];
   extras: ChunkExtra[];
   buildings: THREE.Mesh[];
+  /** Anything with text, which must not read backwards when the road is mirrored. */
+  labels: THREE.Mesh[];
 }
 
 export type LampTint = 'teal' | 'sodium';
