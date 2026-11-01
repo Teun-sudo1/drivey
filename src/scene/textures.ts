@@ -2,36 +2,40 @@ import * as THREE from 'three';
 import { colorTexture, createCanvas } from '../lib/canvas';
 import { pick, rand } from '../lib/math';
 
-export const GLOW = (() => {
-  const { canvas, ctx } = createCanvas(128, 128);
-  const r = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  r.addColorStop(0, 'rgba(255,255,255,1)');
-  r.addColorStop(0.18, 'rgba(255,255,255,.55)');
-  r.addColorStop(0.5, 'rgba(255,255,255,.12)');
-  r.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = r;
-  ctx.fillRect(0, 0, 128, 128);
-  return new THREE.CanvasTexture(canvas);
-})();
+type Stops = readonly (readonly [position: number, value: number])[];
 
-export const STREAK = (() => {
-  const { canvas, ctx } = createCanvas(32, 256);
-  const v = ctx.createLinearGradient(0, 0, 0, 256);
-  v.addColorStop(0, 'rgba(255,255,255,0)');
-  v.addColorStop(0.25, 'rgba(255,255,255,.9)');
-  v.addColorStop(0.6, 'rgba(255,255,255,.45)');
-  v.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = v;
-  ctx.fillRect(0, 0, 32, 256);
-  ctx.globalCompositeOperation = 'destination-in';
-  const h = ctx.createLinearGradient(0, 0, 32, 0);
-  h.addColorStop(0, 'rgba(0,0,0,0)');
-  h.addColorStop(0.5, 'rgba(0,0,0,1)');
-  h.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = h;
-  ctx.fillRect(0, 0, 32, 256);
+function ramp(stops: Stops, t: number): number {
+  for (let i = 1; i < stops.length; i++) {
+    const [p0, v0] = stops[i - 1], [p1, v1] = stops[i];
+    if (t <= p1) return v0 + ((v1 - v0) * (t - p0)) / (p1 - p0);
+  }
+  return stops[stops.length - 1][1];
+}
+
+/**
+ * A white texture with computed alpha. Canvas gradients can't be used for these:
+ * in Safari they come out noisy, which additive blending turns into visible speckle.
+ */
+function alphaTexture(w: number, h: number, alpha: (x: number, y: number) => number): THREE.CanvasTexture {
+  const { canvas, ctx } = createCanvas(w, h);
+  const image = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      image.data[i] = image.data[i + 1] = image.data[i + 2] = 255;
+      image.data[i + 3] = Math.round(alpha(x + 0.5, y + 0.5) * 255);
+    }
+  }
+  ctx.putImageData(image, 0, 0);
   return new THREE.CanvasTexture(canvas);
-})();
+}
+
+const GLOW_FALLOFF: Stops = [[0, 1], [0.18, 0.55], [0.5, 0.12], [1, 0]];
+export const GLOW = alphaTexture(128, 128, (x, y) => ramp(GLOW_FALLOFF, Math.min(1, Math.hypot(x - 64, y - 64) / 64)));
+
+const STREAK_LENGTH: Stops = [[0, 0], [0.25, 0.9], [0.6, 0.45], [1, 0]];
+const STREAK_WIDTH: Stops = [[0, 0], [0.5, 1], [1, 0]];
+export const STREAK = alphaTexture(32, 256, (x, y) => ramp(STREAK_LENGTH, y / 256) * ramp(STREAK_WIDTH, x / 32));
 
 export function windowTexture(lit: number): THREE.CanvasTexture {
   const { canvas, ctx } = createCanvas(128, 256);
