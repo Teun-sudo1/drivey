@@ -36,3 +36,9 @@ npm test           # unit tests
 | `src/ui` | HUD, settings surface, shortcuts and styles |
 | `src/platform` | Browser adapter; a Capacitor implementation plugs in here |
 | `src/lib` | Small shared helpers |
+
+## Hosting
+
+Every push to `main` runs the tests, builds the app and deploys it to GitHub Pages through `.github/workflows/deploy.yml`.
+
+Live at <https://teun-sudo1.github.io/drivey/>.
