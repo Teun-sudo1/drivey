@@ -1,4 +1,4 @@
-import { brightnessAt, expect, glassPixels, isPortrait, mirrorInnerRect, openApp, openSceneTab, screenOf, test, update } from './support';
+import { advance, brightnessAt, expect, glassPixels, isPortrait, mirrorInnerRect, openApp, openSceneTab, screenOf, test, update } from './support';
 
 test.describe('time of day and weather controls', () => {
   test('choosing them updates the label, saves and blends gradually', async ({ page }) => {
@@ -11,9 +11,11 @@ test.describe('time of day and weather controls', () => {
 
     // Neither a jump nor stuck: the rain level passes through values in between.
     const level = () => page.evaluate(() => window.__drivey.environment.rainLevel);
-    await expect.poll(level).toBeGreaterThan(0.02);
-    expect(await level()).toBeLessThan(0.98);
-    await expect.poll(level).toBeGreaterThan(0.95);
+    await advance(page, 0.3);
+    expect(await level()).toBeGreaterThan(0.02);
+    expect(await level()).toBeLessThan(0.9);
+    await advance(page, 8);
+    expect(await level()).toBeGreaterThan(0.95);
 
     await page.reload();
     await expect(page.locator('#sub')).toHaveText('City expressway · Dusk · Heavy rain');
@@ -49,9 +51,12 @@ test.describe('windshield', () => {
 
   test('wipers sweep in rain and stay parked when clear', async ({ page }) => {
     await openApp(page, { weather: 'heavy' });
+    await page.evaluate(() => window.__drivey.simulate(0.05));
     const start = (await wiper(page)).angle;
-    await expect.poll(async () => Math.abs((await wiper(page)).angle - start)).toBeGreaterThan(0.2);
+    await advance(page, 0.5);
+    expect(Math.abs((await wiper(page)).angle - start)).toBeGreaterThan(0.2);
     await update(page, { weather: 'clear' });
+    await advance(page, 10);
     await expect.poll(async () => (await wiper(page)).period).toBe(0);
     const parked = (await wiper(page)).angle;
     await page.waitForTimeout(500);
@@ -69,10 +74,12 @@ test.describe('windshield', () => {
 
   test('drops gather in rain, leave trails, and dry up when it stops', async ({ page }) => {
     await openApp(page, { weather: 'heavy' });
+    await advance(page, 3);
     await expect.poll(() => glassPixels(page)).toBeGreaterThan(50);
     await expect.poll(() => page.evaluate(() => window.__drivey.windshield.drops.some((d: any) => !d.flake && d.startY - d.y > 2))).toBe(true);
 
     await update(page, { weather: 'clear' });
+    await advance(page, 10);
     await expect.poll(async () => (await wiper(page)).period).toBe(0);
 
     // Placed beyond the blades' reach, so only drying can remove it, unlike anything they sweep.
@@ -82,12 +89,14 @@ test.describe('windshield', () => {
       windshield.drops.push({ x: windshield.width - 3, y: windshield.top + 8, r: 2, sprite, alpha: 1, flake: false, startY: windshield.top + 8 });
     });
     expect(await page.evaluate(() => window.__drivey.windshield.drops.length)).toBeGreaterThan(0);
-    await expect.poll(() => page.evaluate(() => window.__drivey.windshield.drops.length)).toBe(0);
-    await expect.poll(() => glassPixels(page)).toBe(0);
+    await advance(page, 8);
+    expect(await page.evaluate(() => window.__drivey.windshield.drops.length)).toBe(0);
+    expect(await glassPixels(page)).toBe(0);
   });
 
   test('nothing on the glass is drawn over the mirror or below the dashboard', async ({ page }) => {
     await openApp(page, { weather: 'heavy' });
+    await advance(page, 3);
     await expect.poll(() => glassPixels(page)).toBeGreaterThan(50);
     const size = page.viewportSize()!;
     const dash = await page.evaluate(() => window.__drivey.windshield.bottom);
@@ -114,6 +123,7 @@ test.describe('road surface', () => {
     expect(await page.evaluate(() => window.__drivey.roadSurface.wet.value)).toBeGreaterThan(0.5);
 
     await update(page, { weather: 'clear' });
+    await advance(page, 10);
     await expect.poll(() => page.evaluate(() => window.__drivey.roadSurface.wet.value)).toBe(0);
     const passes = await page.evaluate(() => new Promise<number>(resolve => {
       const { roadSurface } = window.__drivey;
@@ -145,10 +155,12 @@ test.describe('road surface', () => {
     const dry = await brightnessAt(page, probe.x, probe.y, 5);
 
     await update(page, { weather: 'snow' });
+    await advance(page, 10);
     await expect.poll(() => page.evaluate(() => window.__drivey.environment.snowLevel)).toBeGreaterThan(0.95);
     expect(await brightnessAt(page, probe.x, probe.y, 5)).toBeGreaterThan(dry + 25);
 
     await update(page, { tod: 'night' });
+    await advance(page, 10);
     await expect.poll(() => page.evaluate(() => window.__drivey.environment.headlightLevel)).toBeGreaterThan(0.95);
     // Headlights tuned for dark asphalt used to blow snow out to pure white, so check along the beam.
     for (const z of [-5, -7, -9, -12]) {
@@ -175,6 +187,7 @@ test('buildings have contrast by day and stay dark at night', async ({ page }) =
   });
   expect(await luminance()).toBeGreaterThan(0.2);
   await update(page, { tod: 'night' });
+  await advance(page, 10);
   await expect.poll(luminance).toBeLessThan(0.05);
 });
 

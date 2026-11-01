@@ -128,7 +128,7 @@ void Promise.all(['600 15px Inter', '14px Inter', '54px "Share Tech Mono"'].map(
   hud.render();
 });
 
-startLoop(dt => {
+function simulate(dt: number): void {
   const s = settings.value;
   stage.updateFraming(dt, s.reduced);
   environment.update(dt, s.tod, s.weather);
@@ -136,11 +136,16 @@ startLoop(dt => {
   cockpit.update(dt, drive.speed, drive.bend, drive.clock);
   particles.update({ dt, speed: drive.speed, clock: drive.clock, rain: environment.rainLevel, snow: environment.snowLevel, reducedMotion: s.reduced });
   windshield.update({ dt, speed: drive.speed, weather: WEATHERS[s.weather], lamp: environment.lampLevel, mirrored: s.driveSide === 'right' });
-  roadSurface.update(environment.wetLevel, environment.snowLevel, environment.headlightLevel);
-  postfx.render(s.bloom);
+  roadSurface.setLevels(environment.wetLevel, environment.snowLevel, environment.headlightLevel);
+}
+
+startLoop(dt => {
+  simulate(dt);
+  roadSurface.render();
+  postfx.render(settings.value.bloom);
 });
 
 // Lets the browser tests read scene state. Compiled out of the public build.
 if (import.meta.env.MODE === 'e2e') {
-  Object.assign(window, { __drivey: { stage, postfx, pool, cockpit, drive, environment, particles, windshield, roadSurface, timer, settings } });
+  Object.assign(window, { __drivey: { simulate, stage, postfx, pool, cockpit, drive, environment, particles, windshield, roadSurface, timer, settings } });
 }

@@ -1,4 +1,4 @@
-import { expect, isPortrait, mirrorRect, openApp, openSceneTab, overlaps, test, textRect, update } from './support';
+import { advance, expect, isPortrait, mirrorRect, openApp, openSceneTab, overlaps, test, textRect, update } from './support';
 
 const rectOf = async (page: any, selector: string) => {
   const b = (await page.locator(selector).boundingBox())!;
@@ -44,12 +44,15 @@ test.describe('rear-view mirror', () => {
     const dry = await road();
 
     await update(page, { weather: 'snow' });
+    await advance(page, 10);
     await expect.poll(road).toBeGreaterThan(dry + 40);
     await expect.poll(() => page.evaluate(() => window.__drivey.cockpit.mirror.snow)).toBeGreaterThan(0.9);
 
     await update(page, { weather: 'rain' });
+    await advance(page, 10);
     await expect.poll(() => page.evaluate(() => window.__drivey.cockpit.mirror.rain)).toBeGreaterThan(0.4);
     await update(page, { weather: 'fog' });
+    await advance(page, 10);
     await expect.poll(() => page.evaluate(() => window.__drivey.cockpit.mirror.fogVeil)).toBeGreaterThan(0.5);
   });
 
@@ -57,7 +60,8 @@ test.describe('rear-view mirror', () => {
     await openApp(page, { tod: 'night', weather: 'clear' });
     const frame = () => page.evaluate(() => window.__drivey.cockpit.mirror.ctx.canvas.toDataURL());
     const first = await frame();
-    await expect.poll(frame).not.toBe(first);
+    await advance(page, 1);
+    expect(await frame()).not.toBe(first);
   });
 });
 

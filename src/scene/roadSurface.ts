@@ -135,13 +135,16 @@ export class RoadSurface {
   }
 
   /** Renders the reflection every other frame; a slight lag doesn't show in a blurred, wet road. */
-  update(wet: number, snow: number, headlights: number): void {
-    this.wet.value = wet < MIN_WET ? 0 : wet;
-    this.snow.value = snow;
-    this.snowAlbedo.value = lerp(SNOW_ALBEDO_DAY, SNOW_ALBEDO_HEADLIGHTS, headlights);
+  render(): void {
     if (this.wet.value === 0) return;
     this.renderThisFrame = !this.renderThisFrame;
     if (this.renderThisFrame) this.renderReflection();
+  }
+
+  setLevels(wet: number, snow: number, headlights: number): void {
+    this.wet.value = wet < MIN_WET ? 0 : wet;
+    this.snow.value = snow;
+    this.snowAlbedo.value = lerp(SNOW_ALBEDO_DAY, SNOW_ALBEDO_HEADLIGHTS, headlights);
   }
 
   private renderReflection(): void {

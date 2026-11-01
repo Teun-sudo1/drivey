@@ -62,6 +62,13 @@ export async function update(page: Page, patch: Record<string, unknown>): Promis
   await page.evaluate(p => window.__drivey.settings.update(p), patch);
 }
 
+/** Fast-forwards the simulation without rendering, so slow machines don't make tests wait on frames. */
+export async function advance(page: Page, seconds: number): Promise<void> {
+  await page.evaluate(s => {
+    for (let t = 0; t < s; t += 0.05) window.__drivey.simulate(0.05);
+  }, seconds);
+}
+
 export async function openSceneTab(page: Page): Promise<void> {
   await page.click('#btnPanel');
   await page.click('[data-tab="scene"]');

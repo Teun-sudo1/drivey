@@ -21,9 +21,14 @@ test.describe('layout', () => {
     await expect(panel).toHaveAttribute('inert', '');
     await page.click('#btnPanel');
     await expect(panel).not.toHaveAttribute('inert', '');
-    await page.waitForTimeout(600);
+    // The slide-in can lag far behind on a slow machine.
+    const size = page.viewportSize()!;
+    await expect.poll(async () => {
+      const b = (await panel.boundingBox())!;
+      return Math.abs(b.y + b.height - size.height) + Math.abs(b.x + b.width - size.width);
+    }).toBeLessThan(2);
 
-    const box = (await panel.boundingBox())!, size = page.viewportSize()!;
+    const box = (await panel.boundingBox())!;
     if (isPortrait(page)) {
       expect(box.width).toBeGreaterThanOrEqual(size.width - 1);
       expect(Math.abs(box.y + box.height - size.height)).toBeLessThan(2);
