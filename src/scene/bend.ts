@@ -15,12 +15,14 @@ gl_Position = projectionMatrix * mvPosition;`;
 function bendify(mat: THREE.Material): void {
   if (mat.userData.bent) return;
   mat.userData.bent = true;
-  mat.onBeforeCompile = sh => {
+  const ownStep = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh, renderer) => {
     sh.uniforms.uBend = BEND;
     sh.vertexShader = 'uniform float uBend;\n' + sh.vertexShader
       .replace('#include <project_vertex>', BEND_GLSL)
       .replace('vec4 mvPosition = modelViewMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );',
         'vec4 bw = modelMatrix * vec4( 0.0, 0.0, 0.0, 1.0 ); bw.x += uBend * bw.z * bw.z; vec4 mvPosition = viewMatrix * bw;');
+    ownStep.call(mat, sh, renderer);
   };
   mat.needsUpdate = true;
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { hideFromReflection } from '../roadSurface';
 import { BOX, mesh } from '../geometry';
 import { createGauges } from './gauges';
 import { createLcd } from './lcd';
@@ -18,7 +19,8 @@ export interface GlassOccluder {
 /** Low-poly interior, parented to the camera so it never leaves the frame. */
 export class Cockpit {
   readonly dashLight = new THREE.PointLight(0xff9a50, 0.1, 0.8, 2);
-  readonly passLight = new THREE.PointLight(0xffffff, 0, 3.5, 1.5);
+  // Short range: it lights the interior but must not reach the road, 1.77 below it.
+  readonly passLight = new THREE.PointLight(0xffffff, 0, 1.7, 1.5);
   readonly roof = new THREE.Group();
   readonly wheel = new THREE.Group();
   readonly mirror: Mirror;
@@ -73,6 +75,7 @@ export class Cockpit {
     root.add(this.dashLight, this.passLight);
 
     this.addPillars(root, intB);
+    hideFromReflection(root);
 
     const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
     this.glassOccluders = [

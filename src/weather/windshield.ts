@@ -25,6 +25,8 @@ interface Drop {
   sprite: HTMLCanvasElement;
   alpha: number;
   flake: boolean;
+  /** Where a running drop started, so it can leave a trail of water behind it. */
+  startY: number;
 }
 
 const MAX_DROPS = 420;
@@ -35,6 +37,11 @@ const DRY_RATE = 0.15;
 const FLAKE_MELT_RATE = 0.06;
 const VEIL_RATE = 1.1;
 const GLASS_LOWER_EDGE = [-1.2, -0.35, 0.6];
+const RUNNING_DROP_RADIUS = 3.4;
+const MAX_TRAIL = 110;
+/** How far behind the blade its wet smear reaches, in radians. */
+const SMEAR_ANGLE = 0.4;
+const SMEAR_RADII = [0.34, 0.52, 0.7, 0.88];
 
 function dropSprite(tint: string): HTMLCanvasElement {
   const { canvas, ctx: g } = createCanvas(48, 48);
@@ -92,6 +99,8 @@ class CanvasWindshield implements Windshield {
   private wiperWait = 0;
   private wiperAngle = WIPER_PARKED;
   private wiperPeriod = 0;
+  private wiperMotion = 0;
+  private wetGlass = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -149,9 +158,11 @@ class CanvasWindshield implements Windshield {
     const isSnow = w.snow > 0, narrow = this.width > 700 ? 1 : 0.8;
     while (this.dropBudget > 1) {
       this.dropBudget--;
+      const y = rand(this.top, this.bottom);
       this.drops.push({
         x: rand(0, this.width),
-        y: rand(this.top, this.bottom),
+        y,
+        startY: y,
         r: isSnow ? rand(2, 5) : rand(1.4, 4.6) * narrow,
         sprite: isSnow ? this.flake : this.dropTint(lamp),
         alpha: 1,
@@ -175,7 +186,7 @@ class CanvasWindshield implements Windshield {
     const airflow = speed / 22, drying = w.rain === 0 && w.snow === 0;
     for (const d of this.drops) {
       // Big drops get pushed up the glass by the wind.
-      if (!d.flake && d.r > 3.4) d.y -= airflow * d.r * 3 * dt;
+      if (!d.flake && d.r > RUNNING_DROP_RADIUS) d.y -= airflow * d.r * 3 * dt;
       if (d.flake) d.alpha -= dt * FLAKE_MELT_RATE;
       if (drying) d.alpha -= dt * DRY_RATE;
     }
@@ -208,6 +219,8 @@ class CanvasWindshield implements Windshield {
     }
     const angle = WIPER_PARKED + (WIPER_FAR - WIPER_PARKED) * (0.5 - 0.5 * Math.cos(Math.PI * 2 * this.wiperPhase));
     this.clearSwept(Math.min(angle, this.wiperAngle), Math.max(angle, this.wiperAngle));
+    this.wiperMotion = angle - this.wiperAngle;
+    this.wetGlass = w.rain > 0;
     this.wiperAngle = angle;
   }
 
@@ -235,11 +248,13 @@ class CanvasWindshield implements Windshield {
       g.fillStyle = `rgba(190,200,212,${this.veil})`;
       g.fillRect(0, 0, this.width, this.bottom);
     }
+    this.drawTrails();
     for (const d of this.drops) {
       g.globalAlpha = d.alpha;
       g.drawImage(d.sprite, d.x - d.r, d.y - d.r, d.r * 2, d.r * 2);
     }
     g.globalAlpha = 1;
+    this.drawSmear();
     if (this.wiperAngle !== WIPER_PARKED || this.wiperPeriod > 0) this.drawWipers();
     g.restore();
   }
@@ -249,6 +264,10 @@ class CanvasWindshield implements Windshield {
     const g = this.ctx;
     g.beginPath();
     g.rect(0, this.top, this.width, this.bottom - this.top);
+    g.clip();
+    // A separate clip, because with even-odd any occluder reaching past the glass would add area instead of removing it.
+    g.beginPath();
+    g.rect(0, 0, this.width, this.height);
     for (const { object, points } of this.occluders) {
       points.forEach((p, i) => {
         const s = this.project(p.x, p.y, p.z, object);
@@ -258,6 +277,46 @@ class CanvasWindshield implements Windshield {
       g.closePath();
     }
     g.clip('evenodd');
+  }
+
+  private drawTrails(): void {
+    const g = this.ctx;
+    g.strokeStyle = 'rgb(205,218,238)';
+    g.lineCap = 'round';
+    for (const d of this.drops) {
+      const travelled = Math.min(d.startY - d.y, MAX_TRAIL);
+      if (d.flake || travelled < 2) continue;
+      // Two tapering segments: fresh water near the drop, thinning out behind it.
+      g.globalAlpha = d.alpha * 0.13;
+      g.lineWidth = d.r * 0.32;
+      g.beginPath();
+      g.moveTo(d.x, d.y);
+      g.lineTo(d.x, d.y + travelled * 0.45);
+      g.stroke();
+      g.globalAlpha = d.alpha * 0.05;
+      g.lineWidth = d.r * 0.18;
+      g.beginPath();
+      g.moveTo(d.x, d.y + travelled * 0.45);
+      g.lineTo(d.x, d.y + travelled);
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
+
+  /** The film of water a blade leaves behind as it sweeps. */
+  private drawSmear(): void {
+    if (!this.wetGlass || this.wiperMotion === 0) return;
+    const g = this.ctx, L = this.wiperLength, th = this.wiperAngle;
+    const from = -th, to = -(th - Math.sign(this.wiperMotion) * SMEAR_ANGLE);
+    g.strokeStyle = 'rgba(205,218,238,.09)';
+    g.lineWidth = 1.5;
+    for (const [px, py] of this.wiperPivots) {
+      for (const r of SMEAR_RADII) {
+        g.beginPath();
+        g.arc(px, py, r * L, Math.min(from, to), Math.max(from, to));
+        g.stroke();
+      }
+    }
   }
 
   private drawWipers(): void {

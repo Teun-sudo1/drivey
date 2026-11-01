@@ -33,9 +33,47 @@ function alphaTexture(w: number, h: number, alpha: (x: number, y: number) => num
 const GLOW_FALLOFF: Stops = [[0, 1], [0.18, 0.55], [0.5, 0.12], [1, 0]];
 export const GLOW = alphaTexture(128, 128, (x, y) => ramp(GLOW_FALLOFF, Math.min(1, Math.hypot(x - 64, y - 64) / 64)));
 
-const STREAK_LENGTH: Stops = [[0, 0], [0.25, 0.9], [0.6, 0.45], [1, 0]];
-const STREAK_WIDTH: Stops = [[0, 0], [0.5, 1], [1, 0]];
-export const STREAK = alphaTexture(32, 256, (x, y) => ramp(STREAK_LENGTH, y / 256) * ramp(STREAK_WIDTH, x / 32));
+/** Grey noise that repeats seamlessly, for breaking up road surfaces. */
+export const TILING_NOISE = (() => {
+  const size = 256;
+  const data = new Uint8Array(size * size);
+  const smooth = (t: number): number => t * t * (3 - 2 * t);
+  const octaves = [[4, 0.5], [8, 0.27], [16, 0.15], [32, 0.08]] as const;
+  const values = new Float32Array(size * size);
+  for (const [period, weight] of octaves) {
+    const lattice = Array.from({ length: period * period }, () => Math.random());
+    const at = (x: number, y: number): number => lattice[(y % period) * period + (x % period)];
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const fx = (x / size) * period, fy = (y / size) * period;
+        const ix = Math.floor(fx), iy = Math.floor(fy), tx = smooth(fx - ix), ty = smooth(fy - iy);
+        const top = at(ix, iy) + (at(ix + 1, iy) - at(ix, iy)) * tx;
+        const bottom = at(ix, iy + 1) + (at(ix + 1, iy + 1) - at(ix, iy + 1)) * tx;
+        values[y * size + x] += (top + (bottom - top) * ty) * weight;
+      }
+    }
+  }
+  for (let i = 0; i < data.length; i++) data[i] = Math.round(values[i] * 255);
+  const t = new THREE.DataTexture(data, size, size, THREE.RedFormat);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.needsUpdate = true;
+  return t;
+})();
+
+/** Daylight appearance of a building: pale walls with dark glass, on the same grid as the lit windows. */
+export const FACADE = (() => {
+  const { canvas, ctx } = createCanvas(128, 256);
+  ctx.fillStyle = '#d6d3cc';
+  ctx.fillRect(0, 0, 128, 256);
+  ctx.fillStyle = '#2a333f';
+  for (let r = 0; r < 16; r++) for (let k = 0; k < 8; k++) ctx.fillRect(k * 16 + 3, r * 16 + 4, 10, 8);
+  const t = colorTexture(canvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+})();
 
 export function windowTexture(lit: number): THREE.CanvasTexture {
   const { canvas, ctx } = createCanvas(128, 256);

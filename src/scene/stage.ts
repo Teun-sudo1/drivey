@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { colorTexture, createCanvas } from '../lib/canvas';
 import { damp, lerp } from '../lib/math';
 
+/** Objects the driver sees but the road's reflection doesn't. */
+export const INTERIOR_LAYER = 1;
+
 const EYE_HEIGHT = 1.22;
 const NEAR = 0.15; // far enough out to keep depth precision for the road decals
 const REFRAME_RATE = 6;
@@ -32,6 +35,7 @@ export class Stage {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.scene.fog = this.fog;
     this.camera.position.set(0, EYE_HEIGHT, 0);
+    this.camera.layers.enable(INTERIOR_LAYER);
     this.scene.add(this.camera);
 
     const sky = createCanvas(2, 256);

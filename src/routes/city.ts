@@ -46,6 +46,7 @@ function buildChunk(chunk: Chunk, i: number): void {
 export const city: RouteDefinition = {
   name: 'City expressway',
   lampTint: 'teal',
+  lanes: [-0.4, 3.2],
   speed: 22,
   maxBend: 0.00025,
   groundY: -14,

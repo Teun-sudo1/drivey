@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { rand } from '../lib/math';
+import { hideFromReflection } from '../scene/roadSurface';
 import { GLOW } from '../scene/textures';
 
 const MAX_PARTICLES = 2200;
@@ -40,6 +41,8 @@ export class Particles {
     this.snow = new THREE.Points(this.snowGeometry, new THREE.PointsMaterial({ color: 0xffffff, size: 0.09, map: GLOW, transparent: true, depthWrite: false, opacity: 0.9 }));
     this.snow.frustumCulled = false;
     scene.add(this.rain, this.snow);
+    hideFromReflection(this.rain);
+    hideFromReflection(this.snow);
   }
 
   /** Streaks read brighter against the dark, and paler by day. */

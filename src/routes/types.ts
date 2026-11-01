@@ -24,6 +24,8 @@ export interface RouteDefinition {
   name: string;
   /** The lamp colour windshield drops pick up on this route. */
   lampTint: LampTint;
+  /** Centre of the two lanes, where tyres clear tracks in snow. */
+  lanes: readonly [number, number];
   /** Cruising speed in m/s. */
   speed: number;
   /** Largest bend coefficient the road may curve to. */

@@ -17,8 +17,8 @@ export function addLamp(chunk: Chunk, x: number, z: number, arm: number, h: numb
   glow.position.set(arm, h - 0.25, 0);
   glow.scale.set(4.5, 4.5, 1);
   g.add(glow);
-  mesh(PLANE, m.pool, arm, 0.05, 0, 12, 12, 1, g).rotation.x = -Math.PI / 2;
-  mesh(PLANE, m.streak, arm, 0.07, 10, 1.8, 22, 1, g).rotation.x = -Math.PI / 2;
+  // Narrow enough to fade out before the barriers, which would otherwise cut it with a hard edge.
+  mesh(PLANE, m.pool, arm, 0.05, 0, 7, 14, 1, g).rotation.x = -Math.PI / 2;
   chunk.lamps.push({ z, hex });
 }
 

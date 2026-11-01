@@ -28,7 +28,7 @@ export function createLcd() {
       g.fillText(label, 12, 22);
       g.fillStyle = 'rgba(143,183,255,.7)';
       g.font = '12px "Share Tech Mono", monospace';
-      g.fillText('NIGHT DRIVE', 12, 60);
+      g.fillText('DRIVEY', 12, 60);
       texture.needsUpdate = true;
     }
   };

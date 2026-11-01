@@ -44,7 +44,7 @@ export function createHud(timer: Pomodoro, every: () => number, subtitle: () => 
     sub.textContent = subtitle();
     icon.innerHTML = timer.running ? PAUSE_ICON : PLAY_ICON;
     play.setAttribute('aria-label', timer.running ? 'Pause' : 'Start');
-    document.title = (timer.running ? txt + ' · ' : '') + 'Night Drive';
+    document.title = (timer.running ? txt + ' · ' : '') + 'Drivey';
   }
 
   $('#btnPlay').addEventListener('click', () => timer.toggle());

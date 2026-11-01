@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { colorTexture, createCanvas } from '../../lib/canvas';
+import { clamp } from '../../lib/math';
 import { BOX, mesh } from '../geometry';
 import type { GlassOccluder } from './cockpit';
 
@@ -14,6 +15,21 @@ const FOCAL = 60;
 const HORIZON_Y = 42;
 
 const TEAL = '159,255,224', SODIUM = '255,180,107';
+const ROAD_DRY = new THREE.Color(0x25262c);
+const ROAD_WET = new THREE.Color(0x15161b);
+const ROAD_SNOW = new THREE.Color(0x8d94a0);
+
+export interface MirrorEnvironment {
+  top: THREE.Color;
+  bot: THREE.Color;
+  fogC: THREE.Color;
+  fogD: number;
+  wet: number;
+  lamp: number;
+  head: number;
+  rain: number;
+  snow: number;
+}
 
 function roundedRect(w: number, h: number, r: number): THREE.Shape {
   const x = -w / 2, y = -h / 2;
@@ -54,8 +70,13 @@ export class Mirror {
   private readonly texture: THREE.CanvasTexture;
   private readonly skyTop = new THREE.Color();
   private readonly skyBottom = new THREE.Color();
+  private readonly fogColor = new THREE.Color();
+  private readonly roadColor = new THREE.Color();
   private lampLevel = 0;
   private headLevel = 0;
+  private rain = 0;
+  private snow = 0;
+  private fogVeil = 0;
   private drawTimer = DRAW_INTERVAL;
   private travelled = 0;
   private clock = 0;
@@ -87,11 +108,16 @@ export class Mirror {
     ];
   }
 
-  setLight(top: THREE.Color, bottom: THREE.Color, lamp: number, head: number): void {
-    this.skyTop.copy(top);
-    this.skyBottom.copy(bottom);
-    this.lampLevel = lamp;
-    this.headLevel = head;
+  setEnvironment(env: MirrorEnvironment): void {
+    this.skyTop.copy(env.top);
+    this.skyBottom.copy(env.bot);
+    this.fogColor.copy(env.fogC);
+    this.roadColor.copy(ROAD_DRY).lerp(ROAD_WET, env.wet).lerp(ROAD_SNOW, env.snow);
+    this.lampLevel = env.lamp;
+    this.headLevel = env.head;
+    this.rain = env.rain;
+    this.snow = env.snow;
+    this.fogVeil = clamp((env.fogD - 0.004) * 30, 0, 0.85);
   }
 
   update(dt: number, speed: number, bend: number): void {
@@ -117,7 +143,7 @@ export class Mirror {
 
     g.fillStyle = '#101116';
     g.fillRect(0, HORIZON_Y, w, h - HORIZON_Y);
-    g.fillStyle = '#25262c';
+    g.fillStyle = '#' + this.roadColor.getHexString();
     g.beginPath();
     g.moveTo(vx, HORIZON_Y);
     g.lineTo(w * 0.95, h);
@@ -141,6 +167,7 @@ export class Mirror {
     const followZ = 26 + Math.sin(this.clock * 0.23) * 5, s = FOCAL / followZ;
     for (const side of [-1, 1]) this.glow(vx - 3 * s + side * 0.7 * s, HORIZON_Y + 0.7 * s, 6, '255,244,224', this.headLevel);
     g.globalCompositeOperation = 'source-over';
+    this.drawWeather();
 
     // The car's own interior: window frame and rear headrests.
     g.fillStyle = '#050608';
@@ -168,6 +195,34 @@ export class Mirror {
     g.beginPath();
     g.roundRect(1, 1, w - 2, h - 2, (RADIUS / WIDTH) * w);
     g.stroke();
+  }
+
+  private drawWeather(): void {
+    const g = this.ctx, w = CANVAS_W, h = CANVAS_H;
+    if (this.fogVeil > 0.01) {
+      g.fillStyle = `rgba(${this.fogColor.r * 255},${this.fogColor.g * 255},${this.fogColor.b * 255},${this.fogVeil})`;
+      g.fillRect(0, 0, w, h);
+    }
+    if (this.rain > 0.02) {
+      g.strokeStyle = 'rgba(190,205,225,.3)';
+      g.lineWidth = 0.7;
+      g.beginPath();
+      for (let i = 0; i < this.rain * 34; i++) {
+        const x = Math.random() * w, y = Math.random() * h;
+        // Rain seen from the rear window streaks in towards the road's vanishing point.
+        g.moveTo(x, y);
+        g.lineTo(x + (w / 2 - x) * 0.05, y + 6);
+      }
+      g.stroke();
+    }
+    if (this.snow > 0.02) {
+      g.fillStyle = 'rgba(245,248,255,.8)';
+      for (let i = 0; i < this.snow * 26; i++) {
+        const x = (i * 83.3 + Math.sin(this.clock + i) * 5) % w;
+        const y = (i * 37.7 + this.clock * 14) % h;
+        g.fillRect(x, y, 1.6, 1.6);
+      }
+    }
   }
 
   private glow(x: number, y: number, r: number, rgb: string, alpha: number): void {

@@ -3,7 +3,7 @@ import { damp, lerp } from '../lib/math';
 import type { Backdrop } from '../scene/backdrop';
 import type { Cockpit } from '../scene/cockpit/cockpit';
 import type { SceneLights } from '../scene/lights';
-import { LAMP_KINDS, MATERIALS, SIGN_MATERIALS, WINDOW_MATERIALS } from '../scene/materials';
+import { BUILDING_DAY_COLORS, BUILDING_NIGHT_COLOR, LAMP_KINDS, MATERIALS, SIGN_MATERIALS, WINDOW_MATERIALS } from '../scene/materials';
 import type { PostFx } from '../scene/postfx';
 import type { Stage } from '../scene/stage';
 import type { Particles } from './particles';
@@ -40,6 +40,10 @@ function targetState(tod: TimeOfDayId, weather: WeatherId): EnvState {
 
 const ROAD_DRY = new THREE.Color(0x2a2b30);
 const ROAD_WET = new THREE.Color(0x111216);
+const LINE_DRY = new THREE.Color(0xd8d8d0);
+const CONCRETE_DRY = new THREE.Color(0x5a5b61);
+const DARK_DRY = new THREE.Color(0x1b1d22);
+const SNOW_COVER = new THREE.Color(0xaab2bf);
 
 /** Eases the whole scene towards the selected time of day and weather. */
 export class Environment {
@@ -58,6 +62,14 @@ export class Environment {
 
   get lampLevel(): number {
     return this.state?.lamp ?? 0;
+  }
+
+  get headlightLevel(): number {
+    return this.state?.head ?? 0;
+  }
+
+  get wetLevel(): number {
+    return this.state?.wet ?? 0;
   }
 
   get rainLevel(): number {
@@ -106,18 +118,28 @@ export class Environment {
     lights.sun.color.copy(env.sunCol);
     lights.headlights.intensity = 170 * env.head + 30 * env.over * (1 - env.head);
     cockpit.dashLight.intensity = 0.03 + 0.1 * env.lamp;
-    cockpit.mirror.setLight(env.top, env.bot, env.lamp, env.head);
-    for (const m of WINDOW_MATERIALS) m.emissiveIntensity = env.win;
+    cockpit.mirror.setEnvironment(env);
+    const daylight = 1 - Math.min(1, env.win);
+    WINDOW_MATERIALS.forEach((m, i) => {
+      m.emissiveIntensity = env.win;
+      m.color.copy(BUILDING_NIGHT_COLOR).lerp(BUILDING_DAY_COLORS[i], daylight);
+      // Metal without anything to reflect just reads as black.
+      m.metalness = lerp(0.4, 0.05, daylight);
+      m.roughness = lerp(0.5, 0.85, daylight);
+    });
     for (const m of SIGN_MATERIALS) m.emissiveIntensity = 0.05 + 0.3 * env.lamp;
     MATERIALS.under.color.setRGB(1, 0.85, 0.63).multiplyScalar(0.15 + 1.1 * env.lamp);
     for (const m of LAMP_KINDS.values()) {
       m.head.color.copy(m.base).multiplyScalar(0.15 + 2.85 * env.lamp);
       m.glow.opacity = env.lamp * 0.9;
-      m.pool.opacity = env.lamp * (0.2 + 0.18 * env.wet);
-      m.streak.opacity = env.lamp * env.wet * 0.5;
+      m.pool.opacity = env.lamp * (0.16 + 0.04 * env.wet);
     }
     MATERIALS.road.color.copy(ROAD_DRY).lerp(ROAD_WET, env.wet);
     MATERIALS.road.roughness = lerp(0.92, 0.5, env.wet);
+    MATERIALS.line.color.copy(LINE_DRY).lerp(SNOW_COVER, env.snow * 0.9);
+    MATERIALS.line.emissiveIntensity = 0.35 * (1 - env.snow);
+    MATERIALS.concrete.color.copy(CONCRETE_DRY).lerp(SNOW_COVER, env.snow * 0.55);
+    MATERIALS.dark.color.copy(DARK_DRY).lerp(SNOW_COVER, env.snow * 0.35);
     this.backdrop.applyEnvironment(env.fogC, env.fogD, env.win, env.star);
     this.particles.applyEnvironment(env.head);
   }
