@@ -26,7 +26,7 @@ npx playwright test --project=phone-portrait
 npx playwright test -g "wipers"
 ```
 
-The tests use a separate build (`npm run build:e2e`) that exposes scene state on `window.__drivey`; the public build doesn't include it. Every push to `main` runs the laptop Chromium setup on GitHub, and a failure stops the deploy. The phone and WebKit setups only run locally, so run the full `npm run test:e2e` before pushing.
+The tests use a separate build (`npm run build:e2e`) that exposes scene state on `window.__drivey`; the public build doesn't include it. GitHub doesn't run the browser tests, so deploys take about a minute: run the full `npm run test:e2e` locally and only push when it passes.
 
 When adding a feature, add its test in `e2e/`, then break the feature on purpose to check that the test fails.
 
@@ -67,6 +67,6 @@ A route is a `RouteDefinition` in `src/routes/`: a function that fills a 40 m ch
 
 ## Hosting
 
-Every push to `main` runs the tests, builds the app and deploys it to GitHub Pages through `.github/workflows/deploy.yml`.
+Every push to `main` runs the unit tests, builds the app and deploys it to GitHub Pages through `.github/workflows/deploy.yml`.
 
 Live at <https://teun-sudo1.github.io/drivey/>.
