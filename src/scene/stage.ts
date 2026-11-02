@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { colorTexture, createCanvas } from '../lib/canvas';
 import { damp, lerp } from '../lib/math';
-import type { SeatId } from '../app/settings';
 
 /** Objects the driver sees but the road's reflection doesn't. */
 export const INTERIOR_LAYER = 1;
@@ -13,8 +12,8 @@ export const MIRROR_OUTER_HEIGHT = 0.087;
 const EYE_HEIGHT = 1.22;
 const NEAR = 0.15; // far enough out to keep depth precision for the road decals
 const REFRAME_RATE = 6;
-/** Landscape screens shorter than this are phones, which sit close by default. */
-const PHONE_HEIGHT = 500;
+/** Screens whose short side is under this are phones, which sit close by default. */
+const PHONE_SHORT_SIDE = 500;
 
 const FRAMING_KEYS = ['fov', 'pitch', 'roofY', 'mirrorX', 'mirrorY', 'mirrorYaw', 'radioX', 'radioY', 'radioZ', 'radioTilt', 'radioScale', 'radioSide', 'gaugeScale', 'seatBack', 'lookDown'] as const;
 
@@ -48,6 +47,8 @@ const LANDSCAPE: Framing = {
 };
 /** Close to the wheel, as a phone on its side sits by default, so the radio stays big enough to read and tap. */
 const CLOSE: Framing = { ...LANDSCAPE, fov: 55, seatBack: 0, lookDown: 0 };
+/** Sat back with the phone upright: straight back, so the mirror can still be placed below the top bar. */
+const PORTRAIT_BACK_SEAT = 0.3;
 /** The roof is framed out of view here, so the mirror hangs just below the top bar instead; see targetFraming. */
 const PORTRAIT: Framing = {
   fov: 70, pitch: 0.07, roofY: 0.42, mirrorX: -0.03, mirrorY: 0, mirrorYaw: 0.03,
@@ -55,8 +56,14 @@ const PORTRAIT: Framing = {
   radioX: 0, radioY: -0.22, radioZ: -0.93, radioTilt: -0.26, radioScale: 0.78, radioSide: 1, gaugeScale: 0.78, seatBack: 0, lookDown: 0
 };
 
+function blend(a: Framing, b: Framing, t: number): Framing {
+  const out = { ...a };
+  for (const key of FRAMING_KEYS) out[key] = lerp(a[key], b[key], t);
+  return out;
+}
+
 export class Stage {
-  private seat: SeatId = 'auto';
+  private pov: number | null = null;
   private maxPixelRatio = 2;
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -133,27 +140,28 @@ export class Stage {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Where the driver sits; the framing eases there, or jumps there on startup. */
-  setSeat(seat: SeatId, snap = false): void {
-    if (seat === this.seat && !snap) return;
-    this.seat = seat;
+  /** Where the driver sits, 0 close to 1 sat back, or null for the screen's default; eases there, or jumps on startup. */
+  setPov(pov: number | null, snap = false): void {
+    if (pov === this.pov && !snap) return;
+    this.pov = pov;
     this.settled = false;
     if (snap) Object.assign(this.framing, this.targetFraming());
   }
 
-  /** The seat as it applies on this screen. */
-  seatFor(height = innerHeight): 'close' | 'back' {
-    if (this.seat !== 'auto') return this.seat;
-    return height < PHONE_HEIGHT ? 'close' : 'back';
+  /** How far back the driver sits on this screen. */
+  povFor(): number {
+    return this.pov ?? (Math.min(innerWidth, innerHeight) < PHONE_SHORT_SIDE ? 0 : 1);
   }
 
   private targetFraming(): Framing {
-    if (innerHeight <= innerWidth) return this.seatFor(innerHeight) === 'close' ? CLOSE : LANDSCAPE;
+    const pov = this.povFor();
+    if (innerHeight <= innerWidth) return blend(CLOSE, LANDSCAPE, pov);
     // The cockpit hangs off the camera, so this is plain projection with no pitch involved.
+    const seatBack = pov * PORTRAIT_BACK_SEAT, distance = MIRROR_DISTANCE + seatBack;
     const focal = innerHeight / 2 / Math.tan(THREE.MathUtils.degToRad(PORTRAIT.fov / 2));
-    const heightPx = (MIRROR_OUTER_HEIGHT / MIRROR_DISTANCE) * focal;
+    const heightPx = (MIRROR_OUTER_HEIGHT / distance) * focal;
     const centerPx = this.mirrorTopPx + heightPx / 2;
-    return { ...PORTRAIT, mirrorY: ((innerHeight / 2 - centerPx) / focal) * MIRROR_DISTANCE };
+    return { ...PORTRAIT, seatBack, mirrorY: ((innerHeight / 2 - centerPx) / focal) * distance };
   }
 
   private resize(): void {

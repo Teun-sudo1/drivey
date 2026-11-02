@@ -13,7 +13,7 @@ import { CarEngine } from './app/carEngine';
 import { startLoop } from './app/loop';
 import { SCENE_PRESETS, matchingPreset } from './app/scenePresets';
 import { QUALITY, resolveQuality, type QualityId } from './app/quality';
-import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type SeatId, type ToggleKey } from './app/settings';
+import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type ToggleKey } from './app/settings';
 import { MusicPlayer } from './music/player';
 import { getPlatform } from './platform';
 import { ROUTES, type RouteId } from './routes';
@@ -44,7 +44,7 @@ import { createSessionCard } from './ui/sessionCard';
 import { showTipsOnce } from './ui/tips';
 import { createStartScreen } from './ui/startScreen';
 import { toast } from './ui/toast';
-import { mountSegmented, mountStepper, mountSwitch } from './ui/widgets';
+import { mountSegmented, mountSlider, mountStepper, mountSwitch } from './ui/widgets';
 import { Environment } from './weather/environment';
 import { Particles } from './weather/particles';
 import { LATER, TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './weather/tables';
@@ -77,15 +77,15 @@ engine.onChange(state => {
 });
 const environment = new Environment(stage, lights, postfx, cockpit, backdrop, particles);
 const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera, cockpit.roof, cockpit.glassOccluders, cockpit.sideWindows, route.lampTint);
-settings.onChange(() => stage.setSeat(settings.value.seat));
-stage.setSeat(settings.value.seat, true);
+settings.onChange(() => stage.setPov(settings.value.pov));
+stage.setPov(settings.value.pov, true);
 // The first visit picks a seat behind steamed-up glass, so the scenery is still a surprise.
 windshield.setMisted(!settings.value.seatPicked, true);
 cockpit.setCabinLight(!settings.value.seatPicked);
 const startScreen = createStartScreen(engine, {
   needed: !settings.value.seatPicked,
   done: () => {
-    settings.update({ seat: stage.seatFor(), seatPicked: true });
+    settings.update({ pov: stage.povFor(), seatPicked: true });
     windshield.setMisted(false);
     cockpit.setCabinLight(false);
   }
@@ -207,7 +207,7 @@ const sceneControls = [
   ),
   ...[$('#segRoute'), $('#startRoute')].map(el => mountSegmented<RouteId>(el, options(ROUTES), () => settings.value.route, route => settings.update({ route }))),
   ...[$('#segSide'), $('#startSide')].map(el => mountSegmented<DriveSide>(el, [['left', 'Left'], ['right', 'Right']], () => settings.value.driveSide, driveSide => settings.update({ driveSide }))),
-  ...[$('#segSeat'), $('#startSeatChoice')].map((el, i) => mountSegmented<SeatId>(el, [...(i ? [] : [['auto', 'Auto'] as const]), ['close', 'Close to the wheel'], ['back', 'Sit back']], () => (i ? stage.seatFor() : settings.value.seat), seat => settings.update({ seat }))),
+  ...[$<HTMLInputElement>('#segPov'), $<HTMLInputElement>('#startPov')].map(el => mountSlider(el, () => stage.povFor(), pov => settings.update({ pov }))),
   mountSegmented<QualityId>($('#segQuality'), [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], () => settings.value.quality, q => settings.update({ quality: q })),
   ...[$('#segTod'), $('#startTod')].map(el => mountSegmented<TimeOfDayId>(el, options(TIMES_OF_DAY), () => settings.value.tod, tod => settings.update({ tod }))),
   ...[$('#segWeather'), $('#startWeather')].map(el => mountSegmented<WeatherId>(el, options(WEATHERS), () => settings.value.weather, weather => settings.update({ weather })))

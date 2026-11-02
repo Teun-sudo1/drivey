@@ -60,3 +60,13 @@ export function mountSegmented<T extends string>(el: HTMLElement, options: reado
   refresh();
   return refresh;
 }
+
+/** A range input from 0 to 1 that shows a setting and changes it as it's dragged. */
+export function mountSlider(input: HTMLInputElement, get: () => number, set: (v: number) => void): () => void {
+  input.addEventListener('input', () => set(Number(input.value)));
+  const refresh = (): void => {
+    input.value = String(get());
+  };
+  refresh();
+  return refresh;
+}

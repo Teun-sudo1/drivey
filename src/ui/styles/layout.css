@@ -52,6 +52,8 @@ body.idle { cursor: none; }
     left: auto; right: calc(22px + var(--sr)); bottom: auto; top: 50%;
     transform: translateY(-50%); flex-direction: column;
   }
+  /* Lines the fullscreen button up with the column below: (64px play − 44px icon) / 2 further in. */
+  #top { right: calc(32px + var(--sr)); }
 }
 
 /* Settings surface */

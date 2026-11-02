@@ -47,13 +47,12 @@ export interface Settings {
   followSession: boolean;
   /** Whether the first-drive tips have been dismissed. */
   tipsSeen: boolean;
-  /** Where the driver sits; auto sits close on a phone and back from the wheel on bigger screens. */
-  seat: SeatId;
+  /** Where the driver sits, from 0 close to the wheel to 1 sat back; null sits close on a phone and back on bigger screens. */
+  pov: number | null;
   /** Whether the first visit's choice of seat has been made. */
   seatPicked: boolean;
 }
 
-export type SeatId = 'auto' | 'close' | 'back';
 
 export type DurationKey = 'focus' | 'short' | 'long' | 'every';
 export type ToggleKey = 'bloom' | 'vignette' | 'grain' | 'reduced' | 'auto' | 'breakSlow' | 'follow' | 'muted' | 'followSession';
@@ -94,7 +93,7 @@ function defaults(): Settings {
     quality: 'auto',
     followSession: true,
     tipsSeen: false,
-    seat: 'auto',
+    pov: null,
     seatPicked: false
   };
 }
@@ -133,7 +132,10 @@ function sanitize(stored: unknown): Settings {
     }).slice(0, MAX_PRESETS);
   }
   if (raw.quality === 'auto' || raw.quality === 'low' || raw.quality === 'medium' || raw.quality === 'high') s.quality = raw.quality;
-  if (raw.seat === 'auto' || raw.seat === 'close' || raw.seat === 'back') s.seat = raw.seat;
+  if (typeof raw.pov === 'number' && Number.isFinite(raw.pov)) s.pov = clamp(raw.pov, 0, 1);
+  // Before the slider, the seat was one of two choices.
+  const { seat } = stored as { seat?: unknown };
+  if (seat === 'close' || seat === 'back') s.pov = seat === 'back' ? 1 : 0;
   if (typeof raw.task === 'string') s.task = raw.task.slice(0, MAX_TASK);
   for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow', 'follow', 'muted', 'musicOn', 'tipsSeen', 'seatPicked', 'followSession'] as const) {
     const v = raw[k];

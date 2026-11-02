@@ -59,6 +59,16 @@ test.describe('layout', () => {
     expect(canvas).toEqual({ w: size.height, h: size.width });
   });
 
+  test('in landscape the buttons on the right line up in one column', async ({ page }) => {
+    test.skip(isPortrait(page), 'upright, the controls sit in a row at the bottom');
+    await openApp(page);
+    const centres = await page.evaluate(() => ['#btnFull', '#btnReset', '#btnPlay', '#btnSkip', '#btnPanel'].map(sel => {
+      const r = document.querySelector(sel)!.getBoundingClientRect();
+      return r.left + r.width / 2;
+    }));
+    for (const x of centres) expect(Math.abs(x - centres[2])).toBeLessThan(1);
+  });
+
   test('graphics toggles reach the page', async ({ page }) => {
     await openApp(page, { grain: true, vignette: true, reduced: false });
     await page.click('#btnPanel');

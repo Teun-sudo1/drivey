@@ -44,7 +44,7 @@ Settings › Stats shows minutes today and over the last seven days, the daily s
 
 ## Where you sit
 
-The first visit starts with the windows steamed up and the roof light on, and asks where you sit: close to the wheel, with big gauges and radio, or sat back, which shows more of the car. The glass clears once you settle in, so the scenery stays a surprise until then. Auto, in Settings › Scene, sits close on phones and back on bigger screens.
+The first visit starts with the windows steamed up and the roof light on, and asks where you sit, on a slider from close to the wheel, with big gauges and radio, to sat back, which shows more of the car. It works with the phone upright or sideways. The glass clears once you settle in, so the scenery stays a surprise until then. Until you choose, phones sit close and bigger screens sit back; the slider is also in Settings › Scene.
 
 ## Install and offline
 
