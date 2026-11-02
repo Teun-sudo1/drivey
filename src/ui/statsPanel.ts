@@ -15,6 +15,8 @@ type Range = '7' | '30';
 
 export interface StatsPanel {
   record(session: SessionRecord): Promise<void>;
+  /** Totals as of now, including anything just recorded. */
+  summary(): { todayMinutes: number; streak: number };
   /** Re-reads the clock, e.g. when the tab opens on a new day. */
   render(): void;
 }
@@ -143,6 +145,7 @@ export function createStatsPanel(store: SessionStore, saveFile: (name: string, t
       await store.put([session]);
       await reload();
     },
+    summary: () => summarize(sessions, new Date(), 1),
     render
   };
 }

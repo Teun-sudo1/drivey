@@ -68,6 +68,12 @@ export const NEON_SIGN_MATERIALS = neonSigns(['MOTEL', 'SURF', 'DINER', 'ARCADE'
 /** Billboards in the city's nightlife district. */
 export const CITY_NEON_MATERIALS = neonSigns(['HOTEL', 'CINEMA', 'JAZZ', 'NOODLES', 'OPEN 24H', 'RECORDS', 'BAR', 'DANCE']);
 
+/** The sign announcing a rest stop. */
+export const REST_SIGN_MATERIAL = (() => {
+  const t = signTexture('Rest area', 'P  ·  Kiosk');
+  return new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.3, roughness: 0.6 });
+})();
+
 export interface LampMaterials {
   base: THREE.Color;
   head: THREE.MeshBasicMaterial;

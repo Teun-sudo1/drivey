@@ -1,9 +1,9 @@
 import * as THREE from 'three';
+import { MAX_PARTICLES } from '../app/quality';
 import { rand } from '../lib/math';
 import { hideFromReflection } from '../scene/roadSurface';
 import { GLOW } from '../scene/textures';
 
-const MAX_PARTICLES = 2200;
 const REDUCED_MOTION_RATE = 0.5;
 const STREAK_LENGTH = 0.045;
 const SPAWN_X = 14;
@@ -29,7 +29,10 @@ export class Particles {
   private readonly snowGeometry = new THREE.BufferGeometry();
   private readonly snow: THREE.Points;
 
-  constructor(scene: THREE.Scene, private readonly budget: number) {
+  /** Streaks at full downpour, set by the quality level. */
+  budget = MAX_PARTICLES;
+
+  constructor(scene: THREE.Scene) {
     for (let i = 0; i < MAX_PARTICLES; i++) {
       this.rainTips.set([rand(-SPAWN_X, SPAWN_X), rand(0, 14), rand(-45, -3)], i * 3);
       this.snowPositions.set([rand(-SPAWN_X, SPAWN_X), rand(0, 12), rand(-40, -3)], i * 3);

@@ -6,10 +6,17 @@ import type { Chunk } from './types';
 export const CHUNK_LENGTH = 40;
 
 export function addLamp(chunk: Chunk, x: number, z: number, arm: number, h: number, hex: number): THREE.Group {
+  const g = buildLamp(chunk.group, x, z, arm, h, hex);
+  chunk.lamps.push({ z, hex, object: g });
+  return g;
+}
+
+/** A street lamp on a post, its head `arm` metres out to the side, with its glow and the pool it casts. */
+export function buildLamp(parent: THREE.Object3D, x: number, z: number, arm: number, h: number, hex: number): THREE.Group {
   const m = lampMaterials(hex);
   const g = new THREE.Group();
   g.position.set(x, 0, z);
-  chunk.group.add(g);
+  parent.add(g);
   mesh(BOX, MATERIALS.metal, 0, h / 2, 0, 0.16, h, 0.16, g);
   mesh(BOX, MATERIALS.metal, arm / 2, h, 0, Math.abs(arm) + 0.1, 0.12, 0.12, g);
   mesh(BOX, m.head, arm, h - 0.1, 0, 0.9, 0.1, 0.32, g);
@@ -19,7 +26,6 @@ export function addLamp(chunk: Chunk, x: number, z: number, arm: number, h: numb
   g.add(glow);
   // Narrow enough to fade out before the barriers, which would otherwise cut it with a hard edge.
   mesh(PLANE, m.pool, arm, 0.05, 0, 7, 14, 1, g).rotation.x = -Math.PI / 2;
-  chunk.lamps.push({ z, hex, object: g });
   return g;
 }
 
@@ -78,4 +84,12 @@ export function addVariant(chunk: Chunk): THREE.Group {
 /** A flat stretch of water from x0 to x1 (either way round), just under the ground at y. */
 export function addWater(parent: THREE.Object3D, x0: number, x1: number, y: number): void {
   mesh(PLANE_L, MATERIALS.water, (x0 + x1) / 2, y, -CHUNK_LENGTH / 2, Math.abs(x1 - x0), CHUNK_LENGTH, 1, parent).rotation.x = -Math.PI / 2;
+}
+
+/** A group for what stands on our side of the road, so a rest stop can clear it. */
+export function addRoadside(chunk: Chunk): THREE.Group {
+  const g = new THREE.Group();
+  chunk.group.add(g);
+  chunk.roadside.push(g);
+  return g;
 }

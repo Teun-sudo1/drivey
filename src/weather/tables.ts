@@ -34,6 +34,9 @@ export interface Weather {
   veil: number;
 }
 
+/** The time of day that follows each, as evening draws in; night stays night. */
+export const LATER: Record<TimeOfDayId, TimeOfDayId> = { day: 'dusk', dusk: 'night', night: 'night' };
+
 export const TIMES_OF_DAY: Record<TimeOfDayId, TimeOfDay> = {
   day: { name: 'Day', top: '#5b8ac2', bot: '#cfdbe6', fog: '#b7c3cf', over: '#9aa3ad', hemi: 2.4, sun: 2.6, sunCol: '#fff1dc', win: 0.06, lamp: 0, head: 0, exp: 0.95, bloom: 0.18, star: 0 },
   dusk: { name: 'Dusk', top: '#1b2047', bot: '#e0855a', fog: '#6a5466', over: '#4a4552', hemi: 0.8, sun: 0.9, sunCol: '#ff9a5c', win: 0.9, lamp: 0.8, head: 0.7, exp: 1.0, bloom: 0.55, star: 0.25 },

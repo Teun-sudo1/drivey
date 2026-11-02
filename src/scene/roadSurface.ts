@@ -28,8 +28,10 @@ varying vec3 vRoad;
 
 const FRAGMENT_HEADER = `
 uniform sampler2D tReflection;
+uniform float uTexelY;
 uniform sampler2D tRoadNoise;
 uniform float uWet;
+uniform float uReflect;
 uniform float uSnow;
 uniform float uSnowAlbedo;
 uniform vec4 uLanes;
@@ -72,19 +74,23 @@ roughnessFactor = mix(mix(roughnessFactor, 0.2, wetMask), 0.85, snowMask);
 `;
 
 /* Sampled in a vertical smear, because rough wet asphalt stretches lights
-   towards the viewer. The samples sit close together so thin lights don't split
-   into a ladder of bands. Jittering them instead shows up as blocks, hatching or
-   sand on bright reflections, depending on the noise. */
+   towards the viewer. The samples are two texels apart, and read from the
+   half-size mip level, whose texels are two wide: so each sample's reach meets
+   the next one's and a one-texel light is smeared evenly. Read from the full
+   size, a light that small falls between samples and shows as a ladder of
+   stripes. Jittering them instead shows up as blocks, hatching or sand on
+   bright reflections, depending on the noise. */
 const REFLECTION_GLSL = `
-if (wetMask > 0.001) {
+if (wetMask * uReflect > 0.001) {
   vec2 reflectionUv = vReflection.xy / vReflection.w;
   // Fades with distance, where the road's noise is too fine and would alias into a zigzag.
   reflectionUv.x += (roadNoise - 0.5) * 0.02 * clamp(4.0 / length(vViewPosition), 0.0, 1.0);
   vec3 reflected = vec3(0.0);
-  for (int i = -4; i <= 4; i++) {
-    reflected += texture2D(tReflection, reflectionUv + vec2(0.0, float(i) * 0.005)).rgb * (5.0 - abs(float(i)));
+  for (int i = -4; i < 4; i++) {
+    float at = float(i) + 0.5;
+    reflected += textureLod(tReflection, reflectionUv + vec2(0.0, at * 2.0 * uTexelY), 1.0).rgb * (4.5 - abs(at));
   }
-  reflected /= 25.0;
+  reflected /= 20.0;
   float facing = clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0);
   float fresnel = mix(0.1, 1.0, pow(1.0 - facing, 5.0));
   // Capped so the lamp overhead can't wash the whole road near the car.
@@ -101,10 +107,15 @@ if (wetMask > 0.001) {
  */
 export class RoadSurface {
   // Multisampled because the rail's long diagonal edge otherwise shows up in the road as a row of steps.
-  private readonly target = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 });
+  private readonly target = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
   private readonly virtualCamera = new THREE.PerspectiveCamera();
   private readonly reflectionMatrix = new THREE.Matrix4();
   private readonly wet = { value: 0 };
+  private readonly texelY = { value: 1 };
+  /** 1 while the reflection is rendered, 0 when the quality setting turns it off. */
+  private readonly reflect = { value: 1 };
+  private detail = 1;
+  private size = { w: 1, h: 1 };
   private readonly snow = { value: 0 };
   private readonly lanes = { value: new THREE.Vector4() };
   private readonly shelters = { value: new THREE.Vector4(NO_SHELTER, NO_SHELTER, NO_SHELTER, NO_SHELTER) };
@@ -127,8 +138,10 @@ export class RoadSurface {
     road.onBeforeCompile = sh => {
       sh.uniforms.uReflectionMatrix = { value: this.reflectionMatrix };
       sh.uniforms.tReflection = { value: this.target.texture };
+      sh.uniforms.uTexelY = this.texelY;
       sh.uniforms.tRoadNoise = { value: TILING_NOISE };
       sh.uniforms.uWet = this.wet;
+      sh.uniforms.uReflect = this.reflect;
       sh.uniforms.uSnow = this.snow;
       sh.uniforms.uSnowAlbedo = this.snowAlbedo;
       sh.uniforms.uLanes = this.lanes;
@@ -146,9 +159,24 @@ export class RoadSurface {
     road.customProgramCacheKey = () => 'road-surface';
 
     stage.onResize((w, h) => {
-      const scale = Math.min(REFLECTION_SHORT_SIDE / Math.min(w, h), REFLECTION_LONG_SIDE / Math.max(w, h), 1);
-      this.target.setSize(Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
+      this.size = { w, h };
+      this.fitTarget();
     });
+  }
+
+  /** Reflection size as a share of full; 0 turns it off and the road just darkens when wet. */
+  setDetail(detail: number): void {
+    this.detail = detail;
+    this.reflect.value = detail > 0 ? 1 : 0;
+    this.fitTarget();
+  }
+
+  private fitTarget(): void {
+    const { w, h } = this.size, detail = Math.max(this.detail, 0.1);
+    const scale = Math.min(REFLECTION_SHORT_SIDE / Math.min(w, h), REFLECTION_LONG_SIDE / Math.max(w, h), 1) * detail;
+    const height = Math.max(1, Math.round(h * scale));
+    this.target.setSize(Math.max(1, Math.round(w * scale)), height);
+    this.texelY.value = 1 / height;
   }
 
   setRoute(route: RouteDefinition): void {
@@ -175,7 +203,7 @@ export class RoadSurface {
 
   /** Renders the reflection every other frame; a slight lag doesn't show in a blurred, wet road. */
   render(): void {
-    if (this.wet.value === 0) return;
+    if (this.wet.value === 0 || !this.reflect.value) return;
     this.renderThisFrame = !this.renderThisFrame;
     if (this.renderThisFrame) this.renderReflection();
   }

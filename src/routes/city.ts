@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { pick, rand } from '../lib/math';
 import { BOX, BOX_L, PLANE, buildingGeometry, mesh } from '../scene/geometry';
 import { CITY_NEON_MATERIALS, CONTAINER_COLORS, LAMP_SODIUM, LAMP_TEAL, MATERIALS, NEON_CYAN, NEON_PINK, SIGN_MATERIALS, WINDOW_MATERIALS } from '../scene/materials';
-import { CHUNK_LENGTH, Instances, addLamp, addRoadBase, addVariant } from './parts';
+import { CHUNK_LENGTH, Instances, addLamp, addRoadBase, addRoadside, addVariant, buildLamp } from './parts';
 import type { Chunk, RouteDefinition } from './types';
 
 const CH = CHUNK_LENGTH;
@@ -92,11 +92,14 @@ function nightlife(chunk: Chunk, o: THREE.Object3D): void {
 function buildChunk(chunk: Chunk, i: number): void {
   const g = chunk.group;
   addRoadBase(chunk, LEFT, RIGHT, [-2.05, 4.85, 7.75, 14.85], [1.4, 11.2]);
-  for (const x of [LEFT - 0.2, MEDIAN, RIGHT + 0.2]) mesh(BOX_L, M.concrete, x, 0.55, -CH / 2, 0.35, 1.1, CH, g);
+  for (const x of [MEDIAN, RIGHT + 0.2]) mesh(BOX_L, M.concrete, x, 0.55, -CH / 2, 0.35, 1.1, CH, g);
+  const roadside = addRoadside(chunk);
+  mesh(BOX_L, M.concrete, LEFT - 0.2, 0.55, -CH / 2, 0.35, 1.1, CH, roadside);
   mesh(BOX_L, M.dark, CENTRE, -0.7, -CH / 2, RIGHT - LEFT + 0.8, 1.2, CH, g); // deck (top below road)
   // Two lamps a chunk, both over our lanes; each costs several draw calls, which phones feel.
   addLamp(chunk, MEDIAN, -10, -3.6, 9, i % 3 ? LAMP_TEAL : LAMP_SODIUM);
-  addLamp(chunk, LEFT - 0.3, -30, 3.4, 9, i % 2 ? LAMP_SODIUM : LAMP_TEAL);
+  const hex = i % 2 ? LAMP_SODIUM : LAMP_TEAL;
+  chunk.lamps.push({ z: -30, hex, object: buildLamp(roadside, LEFT - 0.3, -30, 3.4, 9, hex) });
   towers(chunk, addVariant(chunk));
   harbour(chunk, addVariant(chunk));
   nightlife(chunk, addVariant(chunk));

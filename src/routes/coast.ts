@@ -3,7 +3,7 @@ import { pick, rand } from '../lib/math';
 import { SEA_Y } from '../scene/backdrop';
 import { BOX, BOX_L, PALM_FRONDS, PALM_TRUNK, PLANE, PLANE_L, TREE_CONE, mesh } from '../scene/geometry';
 import { LAMP_SODIUM, MATERIALS, NEON_CYAN, NEON_PINK, NEON_SIGN_MATERIALS, PASTELS } from '../scene/materials';
-import { CHUNK_LENGTH, Instances, addLamp, addRoadBase, addVariant } from './parts';
+import { CHUNK_LENGTH, Instances, addLamp, addRoadBase, addRoadside, addVariant } from './parts';
 import type { Chunk, RouteDefinition } from './types';
 
 const CH = CHUNK_LENGTH;
@@ -34,10 +34,10 @@ function palms(parent: THREE.Object3D, spots: readonly (readonly [x: number, z: 
 
 /** Sand sloping from the seawall into the sea, with surf where it meets the water. */
 function addBeach(chunk: Chunk): void {
-  const g = chunk.group;
+  const g = chunk.group, roadside = addRoadside(chunk);
   // A white seawall with a teal stripe, in place of a guardrail.
-  mesh(BOX_L, M.paint, -2.65, 0.3, -CH / 2, 0.3, 0.9, CH, g);
-  mesh(BOX_L, M.neon, -2.79, 0.45, -CH / 2, 0.02, 0.08, CH, g);
+  mesh(BOX_L, M.paint, -2.65, 0.3, -CH / 2, 0.3, 0.9, CH, roadside);
+  mesh(BOX_L, M.neon, -2.79, 0.45, -CH / 2, 0.02, 0.08, CH, roadside);
   const slope = new THREE.Group();
   slope.position.set(BEACH_EDGE, BEACH_TOP, 0);
   slope.rotation.z = Math.atan(BEACH_DROP / BEACH_WIDTH);
@@ -48,7 +48,7 @@ function addBeach(chunk: Chunk): void {
   for (const [offset, width] of [[0.3, 1.4], [2.2, 0.5]] as const) {
     mesh(PLANE_L, M.foam, -shore + offset, 0.03, -CH / 2, width, CH, 1, slope).rotation.x = -Math.PI / 2;
   }
-  palms(g, Array.from({ length: 4 }, () => [-rand(5, 18), -rand(0, CH)] as const));
+  palms(roadside, Array.from({ length: 4 }, () => [-rand(5, 18), -rand(0, CH)] as const));
 }
 
 /** A lifeguard hut on stilts, in one of the pastels. */

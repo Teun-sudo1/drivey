@@ -62,6 +62,8 @@ export class Traffic {
   vehicles: Vehicle[] = [];
   private route: RouteDefinition;
   private own: OwnLane = { lane: 0, fromLane: 0, shift: 1, timer: 0 };
+  /** Keeps our car in the first lane, moving back to it when there's room, e.g. to pull in at a rest stop. */
+  holdFirstLane = false;
 
   constructor(scene: THREE.Scene, route: RouteDefinition) {
     scene.add(this.group);
@@ -229,10 +231,12 @@ export class Traffic {
       return;
     }
     const { ahead } = this.route.traffic;
-    if (ahead.length < 2 || ourSpeed < OWN_CHANGE_SPEED) return;
+    if (ahead.length < 2) return;
+    if (this.holdFirstLane && own.lane === ahead[0]) return;
     own.timer -= dt;
-    if (own.timer > 0) return;
-    const target = pick(ahead.filter(l => l !== own.lane));
+    // Heading back to the first lane is tried at once, and again every step until there's room.
+    if (!this.holdFirstLane && (ourSpeed < OWN_CHANGE_SPEED || own.timer > 0)) return;
+    const target = this.holdFirstLane ? ahead[0] : pick(ahead.filter(l => l !== own.lane));
     const room = this.vehicles.every(v => v.oncoming || !this.occupies(v, target) || v.z + v.length / 2 < OUR_FRONT - OWN_CHANGE_ROOM_AHEAD || v.z - v.length / 2 > OWN_CHANGE_ROOM_BEHIND);
     // Without room it tries again shortly.
     own.timer = room ? rand(...OWN_CHANGE_EVERY) : 3;

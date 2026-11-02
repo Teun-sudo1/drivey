@@ -71,6 +71,18 @@ Music is lofi made live in the browser from oscillators and noise: drums, bass, 
 
 Rain on glass, engine hum, wipers, traffic and wind are generated with Web Audio, so no audio files are needed. The wipers swish in step with the blades on screen, and turning the key plays the starter before the engine catches; the key turn is also what lets the browser start making sound. With "Ambience follows the scene" on, the weather and route shape each level (rain stops in tunnels); the mixer sliders set the level on top. Mixes can be saved as named presets.
 
+## Dashboard radio
+
+The radio on the dash is the music player: each style is a station on the dial (tap one, or a preset button 1–6), SEEK finds a new variation, PWR switches music off and on, and the radio volume scale can be dragged. The timer's display sits in the same unit: under the radio in landscape, beside it on a phone held upright.
+
+## Following the session
+
+With "Scene follows the session" on (Settings › Timer), the light moves on as you focus: over a focus block the scene eases towards the next, later time of day, which stays once the block ends. On a long break the car pulls off the road into a lit rest stop and waits there until focus starts again. Each finished focus block shows a short card with the task, its minutes, today's total and the streak, and the chime for the end of a phase is booked on the audio clock as it starts, so it rings on time in a background tab.
+
+## Quality
+
+Settings › Scene › Graphics has Auto, Low, Medium and High. They scale the rendering resolution, the size of the wet-road reflection (off on Low), the number of rain and snow particles, and whether bloom may run. Auto picks Medium on phones and tablets and High on computers.
+
 ## Keyboard shortcuts
 
 | Key | Action |
@@ -86,7 +98,7 @@ Rain on glass, engine hum, wipers, traffic and wind are generated with Web Audio
 | --- | --- |
 | `src/app` | Frame loop, persisted settings, and the car's ignition state |
 | `src/scene` | Renderer, road chunks, road surface, drive motion, post-processing |
-| `src/scene/cockpit` | Interior: gauges, timer display, nav screen, mirror, volume fader |
+| `src/scene/cockpit` | Interior: gauges, nav screen, mirror, and the radio with the timer display |
 | `src/routes` | One file per route, plus shared road parts |
 | `src/traffic` | Cars and trucks, their lanes, lane changes and spacing |
 | `src/weather` | Time of day and weather, rain and snow, the windshield |
@@ -111,9 +123,12 @@ Rain on glass, engine hum, wipers, traffic and wind are generated with Web Audio
 | Wet and snowy road, reflections | `src/scene/roadSurface.ts` |
 | Raindrops, wipers and their clipping | `src/weather/windshield.ts` |
 | Time-of-day and weather values | `src/weather/tables.ts`, `src/weather/environment.ts` |
-| Camera framing per orientation, mirror and fader placement | `src/scene/stage.ts` |
+| Camera framing per orientation, mirror and radio placement, gauge size | `src/scene/stage.ts` |
 | Gauges, timer display, nav screen | `src/scene/cockpit/` |
-| The volume fader | `src/scene/cockpit/volumeFader.ts`, `src/ui/dashVolume.ts` |
+| The dashboard radio and timer display | `src/scene/cockpit/radio.ts`, `src/scene/cockpit/lcd.ts`, `src/ui/dashRadio.ts` |
+| Quality levels | `src/app/quality.ts` |
+| Rest stop | `src/routes/restStop.ts`, `src/scene/chunkPool.ts` |
+| End-of-session card, first-drive tips | `src/ui/sessionCard.ts`, `src/ui/tips.ts` |
 | Music styles and their patterns | `src/music/styles.ts` |
 | Rain, engine, wind and traffic sounds | `src/audio/ambience.ts` |
 | Wiper swish, chime, key clicks | `src/audio/effects.ts` |

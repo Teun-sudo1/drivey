@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import type { EngineState } from '../app/carEngine';
 import { damp, lerp, rand } from '../lib/math';
 import type { RouteDefinition } from '../routes/types';
@@ -10,6 +11,11 @@ import type { Stage } from './stage';
 const BREAK_SPEED_FACTOR = 0.55;
 const REDUCED_MOTION_SWAY = 0.2;
 const MIN_CURVING_SPEED = 2;
+/** Braking for a rest stop, in m/s², and how far the car pulls over: wholly past the road's edge line. */
+const REST_DECEL = 1.2;
+const PULL_OVER = 2.8;
+/** The car moves over only once it's on the apron, which starts this far before the bay, past the barrier's gap. */
+const PULL_OVER_DISTANCE = 12;
 /** The whole cabin shakes while the starter turns the engine over. */
 const CRANK_SHAKE = 0.004;
 
@@ -20,6 +26,8 @@ export class Drive {
   clock = 0;
   /** Sideways shift of our car from its usual lane, in world metres, while it changes lanes. */
   laneOffset = 0;
+  /** How far the car has pulled over towards a rest stop, in metres, before mirroring. */
+  pull = 0;
 
   private bendTarget = 0;
   private bendTimer = 0;
@@ -39,11 +47,16 @@ export class Drive {
     this.bendTimer = rand(4, 10);
   }
 
-  update(dt: number, engine: EngineState, slowed: boolean, reducedMotion: boolean, lampLevel: number): void {
+  /** `restAt` is how far ahead a rest stop's bay is, to stop beside, or null to drive on. */
+  update(dt: number, engine: EngineState, slowed: boolean, reducedMotion: boolean, lampLevel: number, restAt: number | null = null): void {
     this.clock += dt;
-    const cruising = slowed ? this.route.speed * BREAK_SPEED_FACTOR : this.route.speed;
+    let cruising = slowed ? this.route.speed * BREAK_SPEED_FACTOR : this.route.speed;
+    // Brakes so as to come to rest at the bay: the speed from which REST_DECEL stops in the distance left.
+    if (restAt !== null) cruising = Math.min(cruising, Math.sqrt(2 * REST_DECEL * Math.max(0, restAt)));
     const target = engine === 'running' ? cruising : 0;
-    this.speed = lerp(this.speed, target, damp(0.5, dt));
+    this.speed = restAt !== null && target < this.speed ? target : lerp(this.speed, target, damp(0.5, dt));
+    const pullTarget = restAt === null ? 0 : PULL_OVER * THREE.MathUtils.clamp(1 - restAt / PULL_OVER_DISTANCE, 0, 1);
+    this.pull = lerp(this.pull, pullTarget, damp(restAt === null ? 0.4 : 2, dt));
 
     // A parked car stays on a straight piece of road.
     if (this.speed > MIN_CURVING_SPEED) this.bendTimer -= dt;
@@ -77,7 +90,8 @@ export class Drive {
     );
     this.cockpit.roof.position.y = framing.roofY;
     this.cockpit.mirror.place(framing);
-    this.cockpit.fader.place(framing);
+    this.cockpit.radio.place(framing);
+    this.cockpit.scaleGauges(framing.gaugeScale);
     this.cockpit.steer(this.bend);
   }
 }

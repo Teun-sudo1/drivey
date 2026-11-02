@@ -12,6 +12,7 @@ import { Effects } from './audio/effects';
 import { CarEngine } from './app/carEngine';
 import { startLoop } from './app/loop';
 import { SCENE_PRESETS, matchingPreset } from './app/scenePresets';
+import { QUALITY, resolveQuality, type QualityId } from './app/quality';
 import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type ToggleKey } from './app/settings';
 import { MusicPlayer } from './music/player';
 import { getPlatform } from './platform';
@@ -21,7 +22,7 @@ import { ChunkPool, shelterAt } from './scene/chunkPool';
 import { Cockpit } from './scene/cockpit/cockpit';
 import { Drive } from './scene/drive';
 import { createLights, placeHeadlights } from './scene/lights';
-import { CITY_NEON_MATERIALS, NEON_SIGN_MATERIALS, SIGN_MATERIALS } from './scene/materials';
+import { CITY_NEON_MATERIALS, NEON_SIGN_MATERIALS, REST_SIGN_MATERIAL, SIGN_MATERIALS } from './scene/materials';
 import { PostFx } from './scene/postfx';
 import { RoadSurface } from './scene/roadSurface';
 import { Stage } from './scene/stage';
@@ -33,22 +34,23 @@ import { $ } from './ui/dom';
 import { toggleFullscreen } from './ui/fullscreen';
 import { createHud, phaseName } from './ui/hud';
 import { createIdleFade } from './ui/idle';
-import { bindDashVolume } from './ui/dashVolume';
+import { bindDashRadio } from './ui/dashRadio';
+import { STATIONS } from './scene/cockpit/radio';
 import { bindShortcuts } from './ui/shortcuts';
 import { createSoundPanel } from './ui/soundPanel';
 import { createStatsPanel } from './ui/statsPanel';
 import { bindTask } from './ui/task';
+import { createSessionCard } from './ui/sessionCard';
+import { showTipsOnce } from './ui/tips';
 import { createStartScreen } from './ui/startScreen';
 import { toast } from './ui/toast';
 import { mountSegmented, mountStepper, mountSwitch } from './ui/widgets';
 import { Environment } from './weather/environment';
 import { Particles } from './weather/particles';
-import { TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './weather/tables';
+import { LATER, TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './weather/tables';
 import { createWindshield } from './weather/windshield';
 
 const MIRROR_GAP_PX = 8;
-const MOBILE_PARTICLES = 1100;
-const DESKTOP_PARTICLES = 2000;
 
 const platform = getPlatform();
 const settings = await SettingsStore.load(platform.storage);
@@ -59,7 +61,7 @@ const engine = new CarEngine();
 const stage = new Stage($<HTMLCanvasElement>('#gl'));
 const postfx = new PostFx(stage);
 // Signs are picked at random as the road is rebuilt; uploading them all now means none stalls a frame later.
-for (const { map } of [...SIGN_MATERIALS, ...NEON_SIGN_MATERIALS, ...CITY_NEON_MATERIALS]) if (map) stage.renderer.initTexture(map);
+for (const { map } of [...SIGN_MATERIALS, REST_SIGN_MATERIAL, ...NEON_SIGN_MATERIALS, ...CITY_NEON_MATERIALS]) if (map) stage.renderer.initTexture(map);
 const lights = createLights(stage.scene);
 const cockpit = new Cockpit(stage.camera, route.name);
 const backdrop = new Backdrop(stage.scene, route);
@@ -68,8 +70,11 @@ const pool = new ChunkPool(stage.scene, route);
 const drive = new Drive(stage, pool, backdrop, cockpit, route);
 const traffic = new Traffic(stage.scene, route);
 cockpit.mirror.setLamps(route.mirrorLamps);
-const particles = new Particles(stage.scene, matchMedia('(pointer: coarse)').matches ? MOBILE_PARTICLES : DESKTOP_PARTICLES);
+const particles = new Particles(stage.scene);
 engine.onChange(state => cockpit.setEngine(state));
+engine.onChange(state => {
+  if (state === 'running') showTipsOnce(settings);
+});
 const startScreen = createStartScreen(engine);
 const environment = new Environment(stage, lights, postfx, cockpit, backdrop, particles);
 const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera, cockpit.roof, cockpit.glassOccluders, route.lampTint);
@@ -111,11 +116,31 @@ const timer = new Pomodoro(() => settings.value);
 startTimerDriver(timer);
 timer.onChange(() => platform.keepAwake.set(timer.running));
 const stats = createStatsPanel(platform.sessions, platform.saveFile);
+const sessionCard = createSessionCard();
+
+/* The chime for the end of the running phase is scheduled as it starts, on the audio clock,
+   so it rings on time even in a background tab, where timers run late. */
+let chimeFor: number | null = null;
+let cancelChime: (() => void) | null = null;
+timer.onChange(() => {
+  if (timer.endsAt === chimeFor) return;
+  // Called off only if it hasn't rung yet; one whose phase just ended is left to finish.
+  if (chimeFor !== null && Date.now() < chimeFor) cancelChime?.();
+  cancelChime = timer.endsAt === null ? null : effects.chime((timer.endsAt - Date.now()) / 1000);
+  chimeFor = cancelChime ? timer.endsAt : null;
+  if (timer.running) sessionCard.hide();
+});
 timer.onPhaseEnd(({ ended, next, endedAt, minutes }) => {
-  effects.chime();
+  // Without sound when the phase started, nothing was scheduled.
+  if (chimeFor !== endedAt) effects.chime();
   if (ended === 'focus') {
-    const { task, route, tod, weather } = settings.value;
-    stats.record({ endedAt, minutes, task: task.trim(), route, tod, weather }).catch(() => toast('This session couldn’t be saved'));
+    const { task, route, tod, weather, followSession } = settings.value;
+    // The evening that drew in over the session stays.
+    if (followSession && LATER[tod] !== tod) settings.update({ tod: LATER[tod] });
+    stats
+      .record({ endedAt, minutes, task: task.trim(), route, tod, weather })
+      .then(() => sessionCard.show({ task: task.trim(), minutes, ...stats.summary() }))
+      .catch(() => toast('This session couldn’t be saved'));
   }
   toast(next === 'focus' ? 'Break over. Back on the road.' : 'Nice work. Time for a break.');
 });
@@ -170,18 +195,27 @@ const sceneControls = [
   ),
   ...[$('#segRoute'), $('#startRoute')].map(el => mountSegmented<RouteId>(el, options(ROUTES), () => settings.value.route, route => settings.update({ route }))),
   ...[$('#segSide'), $('#startSide')].map(el => mountSegmented<DriveSide>(el, [['left', 'Left'], ['right', 'Right']], () => settings.value.driveSide, driveSide => settings.update({ driveSide }))),
+  mountSegmented<QualityId>($('#segQuality'), [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], () => settings.value.quality, q => settings.update({ quality: q })),
   ...[$('#segTod'), $('#startTod')].map(el => mountSegmented<TimeOfDayId>(el, options(TIMES_OF_DAY), () => settings.value.tod, tod => settings.update({ tod }))),
   ...[$('#segWeather'), $('#startWeather')].map(el => mountSegmented<WeatherId>(el, options(WEATHERS), () => settings.value.weather, weather => settings.update({ weather })))
 ];
 const refreshSoundPanel = createSoundPanel(settings, player);
 const refreshTask = bindTask(settings);
-const showDashVolume = bindDashVolume($<HTMLCanvasElement>('#gl'), stage.camera, cockpit.fader, $<HTMLInputElement>('#dashVolume'), music => settings.update({ mix: { ...settings.value.mix, music } }));
-function applyVolume(): void {
-  cockpit.volume = settings.value.mix.music;
-  showDashVolume(cockpit.volume);
+const showDashVolume = bindDashRadio($<HTMLCanvasElement>('#gl'), stage.camera, cockpit.radio, $<HTMLInputElement>('#dashVolume'), {
+  volume: music => settings.update({ mix: { ...settings.value.mix, music } }),
+  station: i => settings.update({ style: STATIONS[i], musicOn: true }),
+  seek: () => player.next(),
+  power: () => settings.update({ musicOn: !settings.value.musicOn })
+});
+/** The radio shows the music settings: station, volume and whether it's on. */
+function applyRadio(): void {
+  const { mix, style, musicOn } = settings.value;
+  Object.assign(cockpit.radioState, { volume: mix.music, station: STATIONS.indexOf(style), on: musicOn });
+  showDashVolume(mix.music);
 }
-settings.onChange(applyVolume);
-applyVolume();
+settings.onChange(applyRadio);
+applyRadio();
+cockpit.radioState.dial = cockpit.radioState.station;
 settings.onChange(() => {
   hud.render();
   for (const refresh of sceneControls) refresh();
@@ -200,6 +234,18 @@ for (const row of document.querySelectorAll<HTMLElement>('.num')) {
     timer.syncDurations();
   }, DURATION_LIMITS[key]);
 }
+
+/** Resolution, reflection, particles and bloom, scaled together by the quality setting. */
+const touchScreen = matchMedia('(pointer: coarse)').matches;
+let quality = QUALITY.high;
+function applyQuality(): void {
+  quality = QUALITY[resolveQuality(settings.value.quality, touchScreen)];
+  stage.setMaxPixelRatio(quality.pixelRatio);
+  roadSurface.setDetail(quality.reflection);
+  particles.budget = quality.particles;
+}
+settings.onChange(applyQuality);
+applyQuality();
 
 function applyBodyFlags(): void {
   const { grain, vignette, reduced } = settings.value;
@@ -250,11 +296,16 @@ function simulate(dt: number): void {
   const s = settings.value;
   stage.updateFraming(dt, s.reduced);
   const ignitionOn = engine.state === 'on' || engine.state === 'running';
-  environment.update(dt, s.tod, s.weather, ignitionOn);
+  // Following the session: the light moves on through a focus block, and a long break is spent at a rest stop.
+  const evening = s.followSession && timer.phase === 'focus' ? timer.progress : 0;
+  const resting = s.followSession && timer.phase === 'long';
+  pool.requestRestStop(resting);
+  traffic.holdFirstLane = resting;
+  environment.update(dt, s.tod, s.weather, ignitionOn, evening);
   const side = s.driveSide === 'right' ? -1 : 1;
-  drive.laneOffset = traffic.ownOffset * side;
+  drive.laneOffset = (traffic.ownOffset - drive.pull) * side;
   placeHeadlights(lights, side, drive.laneOffset);
-  drive.update(dt, engine.state, s.breakSlow && timer.phase !== 'focus', s.reduced, environment.lampLevel);
+  drive.update(dt, engine.state, s.breakSlow && timer.phase !== 'focus', s.reduced, environment.lampLevel, resting ? pool.restStopDistance() : null);
   traffic.update(dt, drive.speed, environment.headlightLevel);
   cockpit.update(dt, drive.speed, drive.bend, drive.clock);
   const shelters = pool.shelters();
@@ -274,10 +325,10 @@ startLoop(dt => {
   ambience.update({ dt, weather: WEATHERS[s.weather], route: s.route, speed: drive.speed, engine: engine.state, mix: s.mix, follow: s.follow, shelter });
   windshield.draw();
   roadSurface.render();
-  postfx.render(settings.value.bloom);
+  postfx.render(settings.value.bloom && quality.bloom);
 });
 
 // Lets the browser tests read scene state. Compiled out of the public build.
 if (import.meta.env.MODE === 'e2e') {
-  Object.assign(window, { __drivey: { simulate, engine, startScreen, stage, postfx, pool, backdrop, traffic, cockpit, drive, audio, ambience, effects, player, stats, environment, particles, windshield, roadSurface, timer, settings } });
+  Object.assign(window, { __drivey: { simulate, engine, startScreen, stage, postfx, pool, backdrop, traffic, cockpit, drive, audio, ambience, effects, player, stats, sessionCard, quality: () => quality, environment, particles, windshield, roadSurface, timer, settings } });
 }

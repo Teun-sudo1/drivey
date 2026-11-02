@@ -52,6 +52,8 @@
       <h4>Behaviour</h4>
       <div class="tog" data-k="auto">Auto-start next phase</div>
       <div class="tog" data-k="breakSlow">Slow down during breaks</div>
+      <div class="tog" data-k="followSession">Scene follows the session</div>
+      <p class="note">Evening draws in as you focus, and long breaks are spent at a rest stop.</p>
       <p class="note">Keys: Space start/pause · M mute · F fullscreen · H hide UI</p>
     </section>
     <section id="tab-scene">
@@ -66,6 +68,8 @@
       <h4>Weather</h4>
       <div class="seg" id="segWeather" aria-label="Weather"></div>
       <h4>Graphics</h4>
+      <div class="seg" id="segQuality" aria-label="Quality"></div>
+      <p class="note">Auto picks Medium on phones and tablets and High on computers. Low turns off road reflections and bloom for older devices.</p>
       <div class="tog" data-k="bloom">Bloom</div>
       <div class="tog" data-k="vignette">Vignette</div>
       <div class="tog" data-k="grain">Film grain</div>
@@ -123,9 +127,27 @@
   </div>
 </div>
 
-<input type="range" id="dashVolume" class="visually-hidden" min="0" max="1" step="0.01" aria-label="Music volume">
+<input type="range" id="dashVolume" class="visually-hidden" min="0" max="1" step="0.01" aria-label="Radio volume">
 
 <div id="toast" role="status" aria-live="polite"></div>
+
+<div id="sessionCard" class="card hidden" role="dialog" aria-label="Session complete" inert>
+  <h4>Session complete</h4>
+  <b id="cardTask"></b>
+  <p class="card-stats"><span id="cardMinutes"></span> · <span id="cardToday"></span> · <span id="cardStreak"></span></p>
+  <button class="btn" id="btnCardClose">Close</button>
+</div>
+
+<div id="tips" class="card hidden" role="dialog" aria-label="Welcome to Drivey" inert>
+  <h4>Welcome to Drivey</h4>
+  <ul>
+    <li>Press play to start focusing. The timer is on the dashboard display too.</li>
+    <li>The radio on the dash: tap a station or preset, seek for a new tune, drag the volume.</li>
+    <li>The sliders button opens settings: your task, routes, weather, quality, sound and stats.</li>
+    <li class="keys">Keys: Space start/pause · H hide UI · M mute · F fullscreen</li>
+  </ul>
+  <button class="btn" id="btnTips">Got it</button>
+</div>
 
 <div id="start" data-step="setup">
   <div class="start-card" id="startSetup">

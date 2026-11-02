@@ -35,13 +35,17 @@ export class Effects {
     thump.stop(t + 0.55);
   }
 
-  /** Three rising bell notes at the end of a phase. */
-  chime(): void {
+  /**
+   * Three rising bell notes at the end of a phase, `delay` seconds from now. Scheduled on
+   * the audio clock, which keeps time in a background tab where timers are slowed down.
+   * Returns a way to call it off, or null when there's no sound yet.
+   */
+  chime(delay = 0): (() => void) | null {
     const graph = this.audio.graph;
-    if (!graph) return;
+    if (!graph) return null;
     const { ctx, master } = graph;
-    const t = ctx.currentTime;
-    [76, 83, 88].forEach((note, i) => {
+    const t = ctx.currentTime + Math.max(0, delay);
+    const notes = [76, 83, 88].map((note, i) => {
       const o = ctx.createOscillator(), g = ctx.createGain(), at = t + i * 0.18;
       o.type = 'sine';
       o.frequency.value = midiToHz(note);
@@ -52,7 +56,9 @@ export class Effects {
       g.connect(master);
       o.start(at);
       o.stop(at + 2.3);
+      return o;
     });
+    return () => notes.forEach(o => o.stop());
   }
 
   /**

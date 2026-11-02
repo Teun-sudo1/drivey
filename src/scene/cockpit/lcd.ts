@@ -1,35 +1,45 @@
 import { colorTexture, createCanvas } from '../../lib/canvas';
 
+/** The two shapes of the timer display: wide under the radio, or squarer beside it on a phone. */
+const WIDE = { w: 320, h: 80 }, COMPACT = { w: 240, h: 120 };
+
+/** The timer's display, in the radio's amber: barely glowing segments over the faint ghost of unlit ones. */
 export function createLcd() {
-  const { canvas, ctx: g } = createCanvas(320, 80);
-  const texture = colorTexture(canvas);
-  return {
-    texture,
-    draw(txt: string, label: string): void {
-      const gr = g.createLinearGradient(0, 0, 0, 80);
-      gr.addColorStop(0, '#0a1d5e');
-      gr.addColorStop(1, '#05103a');
-      g.fillStyle = gr;
-      g.fillRect(0, 0, 320, 80);
-      g.fillStyle = 'rgba(120,170,255,.12)';
-      g.font = '700 54px "Share Tech Mono", monospace';
-      g.textAlign = 'right';
-      g.textBaseline = 'middle';
-      g.fillText('88:88', 306, 44);
-      g.save();
-      g.shadowColor = '#4d8bff';
-      g.shadowBlur = 14;
-      g.fillStyle = '#8fb7ff';
-      g.fillText(txt, 306, 44);
-      g.restore();
-      g.textAlign = 'left';
-      g.font = '600 14px Inter, sans-serif';
-      g.fillStyle = '#ff5a3a';
-      g.fillText(label, 12, 22);
-      g.fillStyle = 'rgba(143,183,255,.7)';
+  const wide = createCanvas(WIDE.w, WIDE.h), compact = createCanvas(COMPACT.w, COMPACT.h);
+  const textures = { wide: colorTexture(wide.canvas), compact: colorTexture(compact.canvas) };
+
+  const paint = (g: CanvasRenderingContext2D, w: number, h: number, txt: string, label: string, stacked: boolean): void => {
+    g.fillStyle = '#040405';
+    g.fillRect(0, 0, w, h);
+    const size = stacked ? 58 : 54, digitsX = stacked ? w / 2 : w - 14, digitsY = stacked ? h * 0.62 : h * 0.53;
+    g.font = `700 ${size}px "Share Tech Mono", monospace`;
+    g.textAlign = stacked ? 'center' : 'right';
+    g.textBaseline = 'middle';
+    g.fillStyle = 'rgba(255,165,80,.07)';
+    g.fillText('88:88', digitsX, digitsY);
+    g.save();
+    g.shadowColor = 'rgba(255,122,26,.3)';
+    g.shadowBlur = 2;
+    g.fillStyle = '#e0975a';
+    g.fillText(txt, digitsX, digitsY);
+    g.restore();
+    g.textAlign = stacked ? 'center' : 'left';
+    g.font = '600 14px Inter, sans-serif';
+    g.fillStyle = '#e8873a';
+    g.fillText(label, stacked ? w / 2 : 12, stacked ? 20 : 24);
+    if (!stacked) {
+      g.fillStyle = 'rgba(255,175,95,.45)';
       g.font = '12px "Share Tech Mono", monospace';
-      g.fillText('DRIVEY', 12, 60);
-      texture.needsUpdate = true;
+      g.fillText('TIMER', 12, 58);
+    }
+  };
+
+  return {
+    textures,
+    draw(txt: string, label: string): void {
+      paint(wide.ctx, WIDE.w, WIDE.h, txt, label, false);
+      paint(compact.ctx, COMPACT.w, COMPACT.h, txt, label, true);
+      textures.wide.needsUpdate = textures.compact.needsUpdate = true;
     }
   };
 }

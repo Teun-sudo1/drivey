@@ -3,11 +3,11 @@ import { damp, lerp } from '../lib/math';
 import type { Backdrop } from '../scene/backdrop';
 import type { Cockpit } from '../scene/cockpit/cockpit';
 import type { SceneLights } from '../scene/lights';
-import { BUILDING_DAY_COLORS, BUILDING_NIGHT_COLOR, LAMP_KINDS, MATERIALS, CITY_NEON_MATERIALS, NEON_SIGN_MATERIALS, SIGN_MATERIALS, WINDOW_MATERIALS } from '../scene/materials';
+import { BUILDING_DAY_COLORS, BUILDING_NIGHT_COLOR, LAMP_KINDS, MATERIALS, CITY_NEON_MATERIALS, NEON_SIGN_MATERIALS, REST_SIGN_MATERIAL, SIGN_MATERIALS, WINDOW_MATERIALS } from '../scene/materials';
 import type { PostFx } from '../scene/postfx';
 import type { Stage } from '../scene/stage';
 import type { Particles } from './particles';
-import { TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './tables';
+import { LATER, TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './tables';
 
 const BLEND_RATE = 1.1;
 const COLOR_KEYS = ['top', 'bot', 'fogC', 'sunCol'] as const;
@@ -38,6 +38,17 @@ function targetState(tod: TimeOfDayId, weather: WeatherId, power: number): EnvSt
     power
   };
 }
+
+/** Part way from one state to another, for evening drawing in. */
+function blend(a: EnvState, b: EnvState, t: number): EnvState {
+  if (t <= 0) return a;
+  for (const key of COLOR_KEYS) a[key].lerp(b[key], t);
+  for (const key of NUMBER_KEYS) a[key] = lerp(a[key], b[key], t);
+  return a;
+}
+
+/** How finely evening is stepped; each step rebuilds the target, so not every frame. */
+const EVENING_STEPS = 200;
 
 const ROAD_DRY = new THREE.Color(0x2a2b30);
 const ROAD_WET = new THREE.Color(0x111216);
@@ -98,17 +109,20 @@ export class Environment {
     this.stale = true;
   }
 
-  /** `carLights` is whether the ignition is on, which the headlights and dash glow depend on. */
-  update(dt: number, tod: TimeOfDayId, weather: WeatherId, carLights: boolean): void {
-    const power = carLights ? 1 : 0;
-    const key = `${tod}|${weather}|${power}`;
+  /**
+   * `carLights` is whether the ignition is on, which the headlights and dash glow depend on.
+   * `evening`, 0 to 1, is how far the light has gone towards the next, later time of day.
+   */
+  update(dt: number, tod: TimeOfDayId, weather: WeatherId, carLights: boolean, evening = 0): void {
+    const power = carLights ? 1 : 0, step = Math.round(evening * EVENING_STEPS) / EVENING_STEPS;
+    const key = `${tod}|${weather}|${power}|${step}`;
     if (key !== this.targetKey || !this.target) {
       this.targetKey = key;
-      this.target = targetState(tod, weather, power);
+      this.target = blend(targetState(tod, weather, power), targetState(LATER[tod], weather, power), step);
     }
     const target = this.target;
     if (!this.state) {
-      this.state = targetState(tod, weather, power);
+      this.state = blend(targetState(tod, weather, power), targetState(LATER[tod], weather, power), step);
       this.apply(this.state);
       return;
     }
@@ -148,7 +162,7 @@ export class Environment {
       m.metalness = lerp(0.4, 0.05, daylight);
       m.roughness = lerp(0.5, 0.85, daylight);
     });
-    for (const m of SIGN_MATERIALS) m.emissiveIntensity = 0.05 + 0.3 * env.lamp;
+    for (const m of [...SIGN_MATERIALS, REST_SIGN_MATERIAL]) m.emissiveIntensity = 0.05 + 0.3 * env.lamp;
     // Neon reads as pale tubes by day and glows into the bloom at night.
     MATERIALS.neon.color.setScalar(0.45 + 1.4 * env.lamp);
     for (const m of [...NEON_SIGN_MATERIALS, ...CITY_NEON_MATERIALS]) m.color.setScalar(0.5 + 1.1 * env.lamp);

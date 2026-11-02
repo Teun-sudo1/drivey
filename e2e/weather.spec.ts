@@ -199,6 +199,16 @@ test.describe('windshield', () => {
 });
 
 test.describe('road surface', () => {
+  test('the reflection keeps a half-size blurred copy, which smears small lights without stripes', async ({ page }) => {
+    await openApp(page, { route: 'city', tod: 'night', weather: 'rain' });
+    await advance(page, 3);
+    // Reading a full-size reflection two texels at a time splits small lights into ladders of stripes.
+    expect(await page.evaluate(() => {
+      const { texture } = window.__drivey.roadSurface.target;
+      return { mipmaps: texture.generateMipmaps, filter: texture.minFilter };
+    })).toEqual({ mipmaps: true, filter: 1008 });
+  });
+
   test('wet roads get a real reflection, dry roads skip the work', async ({ page }) => {
     await openApp(page, { weather: 'rain' });
     const reflectionPixels = () => page.evaluate(() => {
@@ -226,7 +236,8 @@ test.describe('road surface', () => {
   });
 
   test('the reflection keeps enough resolution in every orientation', async ({ page }) => {
-    await openApp(page, { weather: 'rain' });
+    // At full size; lower quality levels shrink it on purpose.
+    await openApp(page, { weather: 'rain', quality: 'high' });
     const size = await page.evaluate(() => {
       const t = window.__drivey.roadSurface.target;
       return { w: t.width, h: t.height, samples: t.samples };

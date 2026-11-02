@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { pick, rand } from '../lib/math';
 import { CHUNK_LENGTH } from '../routes/parts';
+import { REST_BAY_Z, createRestStop } from '../routes/restStop';
 import type { Chunk, RouteDefinition } from '../routes/types';
 import { bendTree } from './bend';
 import { disposeTree, mergeStatic } from './geometry';
@@ -50,13 +51,29 @@ export class ChunkPool {
   private sinceTunnel = 0;
   private variant = 0;
   private variantLeft = 0;
+  /** Built once and moved into whichever chunk is next to come into view while one is wanted. */
+  private readonly restStop = createRestStop();
+  private restHost: Chunk | null = null;
+  private restWanted = false;
 
   constructor(private readonly scene: THREE.Scene, route: RouteDefinition) {
+    bendTree(this.restStop.group);
     this.setRoute(route);
+  }
+
+  /** Asks for a rest stop ahead; it appears in the next chunk to come into view, far off. */
+  requestRestStop(wanted: boolean): void {
+    this.restWanted = wanted;
+  }
+
+  /** How far ahead the rest stop's parking bay is, in metres, or null without one on the road. */
+  restStopDistance(): number | null {
+    return this.restHost ? -(this.restHost.group.position.z + REST_BAY_Z) : null;
   }
 
   /** Replaces the whole road with a new route's, keeping the chunks where they were. */
   setRoute(route: RouteDefinition): void {
+    this.leaveRestStop();
     for (const chunk of this.chunks) {
       this.scene.remove(chunk.group);
       disposeTree(chunk.group);
@@ -67,7 +84,7 @@ export class ChunkPool {
     this.sinceTunnel = 0;
     this.variantLeft = 0;
     for (let i = 0; i < CHUNK_COUNT; i++) {
-      const chunk: Chunk = { group: new THREE.Group(), lamps: [], extras: [], buildings: [], labels: [], openAir: [], variants: [] };
+      const chunk: Chunk = { group: new THREE.Group(), lamps: [], extras: [], buildings: [], labels: [], openAir: [], roadside: [], variants: [] };
       route.buildChunk(chunk, i);
       // Buildings get new materials, signs flip with the driving side and some scenery hides in tunnels.
       mergeStatic(chunk.group, new Set([...chunk.buildings, ...chunk.labels, ...chunk.openAir]));
@@ -87,6 +104,7 @@ export class ChunkPool {
       chunk.group.scale.x = side;
       for (const label of chunk.labels) label.scale.x = Math.abs(label.scale.x) * side;
     }
+    for (const label of this.restStop.labels) label.scale.x = Math.abs(label.scale.x) * side;
   }
 
   advance(distance: number): void {
@@ -151,7 +169,13 @@ export class ChunkPool {
     return this.variant;
   }
 
+  private leaveRestStop(): void {
+    this.restHost?.group.remove(this.restStop.group);
+    this.restHost = null;
+  }
+
   private refresh(chunk: Chunk, recycled: boolean): void {
+    if (chunk === this.restHost) this.leaveRestStop();
     const stretch = recycled && chunk.tunnel ? this.nextStretch() : 'open';
     const tunnel = stretch !== 'open';
     if (chunk.tunnel) {
@@ -163,6 +187,15 @@ export class ChunkPool {
     if (chunk.variants.length) {
       const shown = this.nextVariant(chunk.variants.length);
       chunk.variants.forEach((v, i) => (v.visible = !tunnel && i === shown));
+    }
+    for (const object of chunk.roadside) object.visible = true;
+    if (recycled && this.restWanted && !this.restHost && !tunnel) {
+      // The lay-by takes the chunk's roadside to itself, with a gap in the barrier to pull in through.
+      for (const v of chunk.variants) v.visible = false;
+      for (const extra of chunk.extras) extra.object.visible = false;
+      for (const object of chunk.roadside) object.visible = false;
+      chunk.group.add(this.restStop.group);
+      this.restHost = chunk;
     }
     for (const building of chunk.buildings) {
       building.material = pick(WINDOW_MATERIALS);

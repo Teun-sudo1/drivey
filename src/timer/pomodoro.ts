@@ -44,6 +44,16 @@ export class Pomodoro {
     this.lengthMs = this.remainingMs = this.phaseLength(this.phase);
   }
 
+  /** How far through the current phase, 0 to 1. */
+  get progress(): number {
+    return 1 - this.remainingMs / this.lengthMs;
+  }
+
+  /** When the running phase will end, in ms since 1970; null while paused. */
+  get endsAt(): number | null {
+    return this.running ? this.endAt : null;
+  }
+
   onChange(listener: () => void): void {
     this.changeListeners.add(listener);
   }

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { rand } from '../lib/math';
 import { BOX, BOX_L, PLANE, ROOF_CONE, TREE_CONE, mesh } from '../scene/geometry';
 import { LAMP_SODIUM, MATERIALS } from '../scene/materials';
-import { CHUNK_LENGTH, Instances, addLamp, addRoadBase, addShoulder, addVariant, addWater } from './parts';
+import { CHUNK_LENGTH, Instances, addLamp, addRoadBase, addRoadside, addShoulder, addVariant, addWater } from './parts';
 import type { Chunk, RouteDefinition } from './types';
 
 const CH = CHUNK_LENGTH;
@@ -72,10 +72,12 @@ function lake(chunk: Chunk, o: THREE.Object3D): void {
 function buildChunk(chunk: Chunk, i: number): void {
   const g = chunk.group;
   addRoadBase(chunk, -2, 4.8, [-1.8, 4.6], [1.4]);
+  const roadside = addRoadside(chunk);
   for (const x of [-2.4, 5.2]) {
+    const parent = x < 0 ? roadside : g;
     for (let k = 0; k < 2; k++) {
-      mesh(BOX, M.metal, x, 0.5, -k * 20 - 8, 0.1, 1, 0.1, g);
-      mesh(BOX, M.reflector, x, 0.85, -k * 20 - 7.94, 0.08, 0.08, 0.02, g);
+      mesh(BOX, M.metal, x, 0.5, -k * 20 - 8, 0.1, 1, 0.1, parent);
+      mesh(BOX, M.reflector, x, 0.85, -k * 20 - 7.94, 0.08, 0.08, 0.02, parent);
     }
   }
   farmland(chunk, addVariant(chunk));

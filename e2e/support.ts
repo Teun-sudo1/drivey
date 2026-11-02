@@ -73,7 +73,7 @@ export const isPhone = (page: Page): boolean => Math.min(page.viewportSize()!.wi
 export async function openApp(page: Page, settings: Record<string, unknown> = {}): Promise<void> {
   await page.addInitScript(s => {
     if (!localStorage.getItem('nd.settings')) localStorage.setItem('nd.settings', JSON.stringify(s));
-  }, { bloom: false, grain: false, vignette: false, ...settings });
+  }, { bloom: false, grain: false, vignette: false, tipsSeen: true, ...settings });
   await page.goto('./');
   await waitForFrames(page);
   await page.evaluate(() => window.__drivey.startScreen.skip());
@@ -83,7 +83,7 @@ export async function openApp(page: Page, settings: Record<string, unknown> = {}
 export async function openParked(page: Page, settings: Record<string, unknown> = {}): Promise<void> {
   await page.addInitScript(s => {
     if (!localStorage.getItem('nd.settings')) localStorage.setItem('nd.settings', JSON.stringify(s));
-  }, { bloom: false, grain: false, vignette: false, ...settings });
+  }, { bloom: false, grain: false, vignette: false, tipsSeen: true, ...settings });
   await page.goto('./');
   await waitForFrames(page);
 }

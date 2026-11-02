@@ -134,3 +134,19 @@ h4 { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: v
   .start-card .seg button { padding: 6px 10px; }
   .start-go { margin-top: 10px; padding: 9px; }
 }
+
+/* Cards over the drive: the end-of-session summary and the first-drive tips. */
+.card {
+  position: fixed; z-index: 6; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(360px, calc(100vw - 32px)); padding: 18px 20px; border-radius: 18px;
+  background: rgba(10, 12, 17, .86); border: 1px solid var(--line);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  transition: opacity .4s;
+}
+.card.hidden { opacity: 0; pointer-events: none; }
+.card h4 { margin-top: 0; }
+.card b { display: block; font-size: 17px; font-weight: 600; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-stats { font-size: 13px; color: var(--mut); }
+.card ul { list-style: none; display: grid; gap: 8px; font-size: 13px; color: #cfd5e2; line-height: 1.45; }
+.card.touch .keys { display: none; }
+.card .btn { margin-top: 14px; }

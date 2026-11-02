@@ -1,5 +1,6 @@
 import { CHANNELS, type Mix } from '../audio/audioEngine';
 import { clamp } from '../lib/math';
+import type { QualityId } from './quality';
 import { STYLES, type StyleId } from '../music/styles';
 import { MAX_TASK } from '../stats/sessions';
 import type { KeyValueStorage } from '../platform/types';
@@ -41,10 +42,15 @@ export interface Settings {
   mixerPresets: MixerPreset[];
   /** What the user is focusing on; stored with each session they finish. */
   task: string;
+  quality: QualityId;
+  /** Evening draws in as you work, and long breaks are spent at a rest stop. */
+  followSession: boolean;
+  /** Whether the first-drive tips have been dismissed. */
+  tipsSeen: boolean;
 }
 
 export type DurationKey = 'focus' | 'short' | 'long' | 'every';
-export type ToggleKey = 'bloom' | 'vignette' | 'grain' | 'reduced' | 'auto' | 'breakSlow' | 'follow' | 'muted';
+export type ToggleKey = 'bloom' | 'vignette' | 'grain' | 'reduced' | 'auto' | 'breakSlow' | 'follow' | 'muted' | 'followSession';
 
 /** min, max, step */
 export const DURATION_LIMITS: Record<DurationKey, readonly [number, number, number]> = {
@@ -78,7 +84,10 @@ function defaults(): Settings {
     muted: false,
     musicOn: true,
     mixerPresets: [],
-    task: ''
+    task: '',
+    quality: 'auto',
+    followSession: true,
+    tipsSeen: false
   };
 }
 
@@ -115,8 +124,9 @@ function sanitize(stored: unknown): Settings {
       return typeof preset?.name === 'string' && preset.name.trim() && mix ? [{ name: preset.name.trim().slice(0, MAX_PRESET_NAME), mix }] : [];
     }).slice(0, MAX_PRESETS);
   }
+  if (raw.quality === 'auto' || raw.quality === 'low' || raw.quality === 'medium' || raw.quality === 'high') s.quality = raw.quality;
   if (typeof raw.task === 'string') s.task = raw.task.slice(0, MAX_TASK);
-  for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow', 'follow', 'muted', 'musicOn'] as const) {
+  for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow', 'follow', 'muted', 'musicOn', 'tipsSeen', 'followSession'] as const) {
     const v = raw[k];
     if (typeof v === 'boolean') s[k] = v;
   }

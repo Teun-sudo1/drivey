@@ -2,20 +2,21 @@ import * as THREE from 'three';
 import type { EngineState } from '../../app/carEngine';
 import { damp, lerp } from '../../lib/math';
 import { hideFromReflection } from '../roadSurface';
-import { BOX, mesh } from '../geometry';
+import { BOX, PLANE, mesh } from '../geometry';
 import { createGauges } from './gauges';
 import { createLcd } from './lcd';
 import { Mirror } from './mirror';
 import { createNav } from './nav';
-import { VolumeFader } from './volumeFader';
+import { CarRadio, type RadioState } from './radio';
 
 const GAUGE_INTERVAL = 0.1;
 const NAV_INTERVAL = 0.25;
 const SWEEP_SECONDS = 1.2;
 /** Far enough in that the display stays fully on screen at a 16:10 laptop's aspect ratio. */
-const LCD_X = -0.58;
 const SCREEN_POWER_RATE = 6;
-/** Full brightness of the gauges, LCD, nav screen and volume fader. */
+/** How quickly the tuning needle slides to a new station. */
+const DIAL_RATE = 5;
+/** Full brightness of the gauges, LCD, nav screen and radio. */
 const SCREEN_LEVELS = [1, 1, 0.73, 1];
 const PILLAR_WIDTH = 0.11;
 
@@ -33,9 +34,9 @@ export class Cockpit {
   readonly roof = new THREE.Group();
   readonly wheel = new THREE.Group();
   readonly mirror: Mirror;
-  readonly fader: VolumeFader;
-  /** Music volume, 0 to 1, as the fader shows it. */
-  volume = 0;
+  readonly radio: CarRadio;
+  /** What the radio shows; the dial eases to the station on its own. */
+  readonly radioState: RadioState = { dial: 0, station: 0, volume: 0, on: true };
   readonly glassOccluders: GlassOccluder[];
   /** The A-pillars' outlines, which mark where the glass ends at the sides. */
   readonly pillars: GlassOccluder[];
@@ -48,6 +49,8 @@ export class Cockpit {
   private sweepLeft = 0;
   private readonly gauges = createGauges();
   private readonly lcd = createLcd();
+  private readonly lcdScreen: THREE.Mesh;
+  private readonly gaugeScreen: THREE.Mesh;
   private readonly nav = createNav();
   private gaugeTimer = GAUGE_INTERVAL;
   private navTimer = NAV_INTERVAL;
@@ -69,8 +72,9 @@ export class Cockpit {
 
     const screen = (texture: THREE.Texture) => new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, color: 0x000000 });
     const gaugeScreen = mesh(new THREE.PlaneGeometry(0.5, 0.164), screen(this.gauges.texture), 0, -0.4, -0.893, 1, 1, 1, root);
-    mesh(BOX, intB, LCD_X, -0.435, -0.98, 0.37, 0.1, 0.14, root);
-    const lcdScreen = mesh(new THREE.PlaneGeometry(0.31, 0.0775), screen(this.lcd.texture), LCD_X, -0.435, -0.909, 1, 1, 1, root);
+    this.radio = new CarRadio(root, intB);
+    // The timer's display, in the radio's housing.
+    this.lcdScreen = mesh(PLANE, screen(this.lcd.textures.wide), 0, 0, 0, 1, 1, 1, this.radio.display);
 
     const navUnit = new THREE.Group();
     navUnit.position.set(0.5, -0.25, -0.86);
@@ -78,7 +82,8 @@ export class Cockpit {
     root.add(navUnit);
     mesh(BOX, intB, 0, 0, -0.012, 0.2, 0.29, 0.02, navUnit);
     const navScreen = mesh(new THREE.PlaneGeometry(0.18, 0.27), screen(this.nav.texture), 0, 0, 0, 1, 1, 1, navUnit);
-    this.screens = [gaugeScreen, lcdScreen, navScreen];
+    this.gaugeScreen = gaugeScreen;
+    this.screens = [gaugeScreen, this.lcdScreen, navScreen];
 
     this.wheel.position.set(0, -0.47, -0.6);
     this.wheel.rotation.x = -0.35;
@@ -90,8 +95,7 @@ export class Cockpit {
     root.add(this.roof);
     mesh(BOX, intB, -0.35, 0.52, -0.82, 2.8, 0.07, 0.55, this.roof);
     this.mirror = new Mirror(root, intB);
-    this.fader = new VolumeFader(root, intB);
-    this.screens.push(this.fader.face);
+    this.screens.push(this.radio.face);
 
     this.dashLight.position.set(0, -0.36, -0.82);
     this.passLight.position.set(-0.2, 0.55, -0.5);
@@ -104,7 +108,7 @@ export class Cockpit {
     this.glassOccluders = [
       ...this.mirror.occluders,
       ...this.pillars,
-      { object: this.fader.group, points: this.fader.outline },
+      { object: this.radio.group, points: this.radio.outline },
       { object: navUnit, points: [V(-0.1, -0.145, 0), V(0.1, -0.145, 0), V(0.1, 0.145, 0), V(-0.1, 0.145, 0)] },
       { object: root, points: [V(-0.29, -0.265, -1.02), V(0.29, -0.265, -1.02), V(0.29, -0.5, -0.9), V(-0.29, -0.5, -0.9)] }
     ];
@@ -115,6 +119,11 @@ export class Cockpit {
     this.side = side;
     this.root.scale.x = side;
     for (const s of this.screens) s.scale.x = side;
+  }
+
+  /** Sizes the gauges for the framing, keeping them mirrored with the interior. */
+  scaleGauges(scale: number): void {
+    this.gaugeScreen.scale.set(scale * this.side, scale, 1);
   }
 
   /** Mirroring the interior would otherwise turn the wheel the wrong way. */
@@ -135,7 +144,15 @@ export class Cockpit {
       this.power = power;
       this.screens.forEach((s, i) => (s.material as THREE.MeshBasicMaterial).color.setScalar(power * SCREEN_LEVELS[i]));
     }
-    this.fader.draw(this.volume);
+    // Beside the radio on a phone, the display takes its squarer shape.
+    const lcdMaterial = this.lcdScreen.material as THREE.MeshBasicMaterial, lcdMap = this.radio.compact ? this.lcd.textures.compact : this.lcd.textures.wide;
+    if (lcdMaterial.map !== lcdMap) {
+      lcdMaterial.map = lcdMap;
+      lcdMaterial.needsUpdate = true;
+    }
+    const r = this.radioState;
+    r.dial = Math.abs(r.dial - r.station) < 0.005 ? r.station : lerp(r.dial, r.station, damp(DIAL_RATE, dt));
+    this.radio.draw(r);
     this.sweepLeft = Math.max(0, this.sweepLeft - dt);
     this.gaugeTimer += dt;
     if (this.gaugeTimer >= GAUGE_INTERVAL) {
@@ -166,7 +183,7 @@ export class Cockpit {
   }
 
   invalidateText(): void {
-    this.fader.invalidate();
+    this.radio.invalidate();
     this.lcdKey = '';
     this.gaugeTimer = GAUGE_INTERVAL;
     this.navTimer = NAV_INTERVAL;

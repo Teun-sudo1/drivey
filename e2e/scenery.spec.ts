@@ -92,8 +92,8 @@ test.describe('coastal road', () => {
       chunk.group.updateMatrixWorld(true);
       const sand = { near: -Infinity, far: Infinity, lowest: Infinity };
       let palms = 0;
-      for (const o of chunk.group.children as any[]) {
-        if (o.isInstancedMesh && o.material.name === 'palmTrunk') palms += o.count;
+      for (const side of chunk.roadside) {
+        for (const o of side.children as any[]) if (o.isInstancedMesh && o.material.name === 'palmTrunk') palms += o.count;
       }
       chunk.group.traverse((o: any) => {
         // The beach is the sand on the sea side, built straight into the chunk rather than one of the land sceneries.

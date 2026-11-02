@@ -230,9 +230,10 @@ test.describe('highway tunnels', () => {
   test('the road in a tunnel stays clear of snow', async ({ page }) => {
     await openApp(page, { route: 'highway', weather: 'snow', tod: 'day' });
     await advance(page, 5);
+    // Far enough ahead to be above the radio on a phone held upright.
     const road = async () => {
-      const p = await screenOf(page, -0.4, 0, -9);
-      return brightnessAt(page, p.x, p.y, 6);
+      const p = await screenOf(page, -0.4, 0, -16);
+      return brightnessAt(page, p.x, p.y, 5);
     };
     const open = await road();
     await driveIntoTunnel(page);
