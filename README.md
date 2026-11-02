@@ -32,6 +32,22 @@ The tests use a separate build (`npm run build:e2e`) that exposes scene state on
 
 When adding a feature, add its test in `e2e/`, then break the feature on purpose to check that the test fails.
 
+## Scene presets
+
+One tap sets the route, time of day, weather and music style together: Rainy Tokyo night, Storm on the expressway, Foggy coast at dusk, Neon highway, Snowy countryside and Sunday drive. They're on the start screen ("Quick start") and under Settings › Scene. Add or change them in `src/app/scenePresets.ts`.
+
+## Tasks and stats
+
+Type what you're working on under Settings › Timer ("What are you focusing on?"); it shows under the timer. Every focus session that runs to the end is stored on the device (IndexedDB) with its length, task, route, time of day and weather. Skipped sessions don't count.
+
+Settings › Stats shows minutes today and over the last seven days, the daily streak, a bar chart of the last 7 or 30 days, and the latest sessions. Export saves the history as a JSON file; Import reads one back and merges it, replacing sessions it already has, so importing the same file twice doesn't double anything. Clear history asks for a second tap.
+
+## Install and offline
+
+Drivey is an installable web app. On an iPhone, open it in Safari and choose Share › Add to Home Screen; in Chrome or Edge, use the install button in the address bar. It then opens full screen with its own icon.
+
+After the first visit it also works with no network. The build writes `sw.js`, a service worker listing every file the app needs (`tools/serviceWorker.ts` makes the list); the browser stores them all, and a new deploy is picked up on the next visit. The dev server doesn't register it. The icons are in `public/` and the manifest is `public/manifest.webmanifest`.
+
 ## Routes
 
 Pick a route on the start screen, or switch mid-drive under Settings › Scene:
@@ -47,7 +63,7 @@ A route is a `RouteDefinition` in `src/routes/`: a function that fills a 40 m ch
 
 ## Music
 
-Music is lofi made live in the browser from oscillators and noise: drums, bass, chords and a sparse melody, with reverb and vinyl crackle. It needs no internet, plays no ads, and starts when the engine does. Under Settings › Sound, pick a style (Chillhop, Jazzy, Ambient, Synthwave, Rainy café); "next" crossfades to a fresh variation in another key. The patterns for each style are in `src/audio/generatedStyles.ts`.
+Music is lofi made live in the browser from oscillators and noise: drums, bass, chords and a sparse melody, with reverb and vinyl crackle. It needs no internet, plays no ads, and starts when the engine does. Under Settings › Sound, pick a style (Chillhop, Jazzy, Ambient, Synthwave, Rainy café); "next" crossfades to a fresh variation in another key. The patterns for each style are in `src/music/styles.ts`.
 
 ## Ambient sound
 
@@ -75,8 +91,11 @@ Rain on glass, engine hum, wipers, traffic and wind are generated with Web Audio
 | `src/audio` | Web Audio engine, mixer channels, ambience and effects |
 | `src/music` | Generated beats: the player, the generator and the styles |
 | `src/timer` | Timestamp-based Pomodoro and its driver |
+| `src/stats` | Session records, daily totals and streak, the export format |
 | `src/ui` | Start screen and key, HUD, settings panel, shortcuts, styles |
-| `src/platform` | Browser adapter; a Capacitor implementation plugs in here |
+| `src/platform` | Browser adapter (settings, session database, keep-awake, file saving, offline); a Capacitor implementation plugs in here |
+| `src/sw.ts`, `tools/` | The offline service worker and the build step that fills in its file list |
+| `public` | Manifest, favicon and app icons |
 | `src/lib` | Small shared helpers |
 | `e2e` | Browser tests, one file per feature; `support.ts` has the helpers |
 
@@ -97,6 +116,10 @@ Rain on glass, engine hum, wipers, traffic and wind are generated with Web Audio
 | Rain, engine, wind and traffic sounds | `src/audio/ambience.ts` |
 | Wiper swish, chime, key clicks | `src/audio/effects.ts` |
 | Settings and their defaults | `src/app/settings.ts` |
+| Scene presets | `src/app/scenePresets.ts` |
+| Stats tab, export and import | `src/ui/statsPanel.ts`, `src/stats/` |
+| Where sessions are stored | `src/platform/sessionDb.ts` |
+| Offline caching | `src/sw.ts`, `tools/serviceWorker.ts` |
 | How everything is wired together | `src/main.ts` |
 
 ## Hosting
@@ -107,10 +130,10 @@ Live at <https://teun-sudo1.github.io/drivey/>.
 
 ## Wrapping for iOS with Capacitor
 
-The app is built to be wrapped without rewrites: assets use relative paths, and storage and keep-awake go through `src/platform/`.
+The app is built to be wrapped without rewrites: assets use relative paths, and storage, the session database, keep-awake and file saving go through `src/platform/`. The service worker is for the web only; a native shell has its files on the device already.
 
 1. `npm install @capacitor/core @capacitor/cli @capacitor/ios`, then `npx cap init Drivey com.example.drivey --web-dir dist`.
 2. `npm run build`, then `npx cap add ios` and `npx cap sync ios`.
-3. Write `src/platform/capacitor.ts` implementing `Platform` with `@capacitor/preferences` for `storage` and `@capacitor-community/keep-awake` for `keepAwake`, and pick it in `src/platform/index.ts` when `Capacitor.isNativePlatform()`.
+3. Write `src/platform/capacitor.ts` implementing `Platform` with `@capacitor/preferences` for `storage`, `@capacitor-community/keep-awake` for `keepAwake`, and `@capacitor/filesystem` with `@capacitor/share` for `saveFile` (IndexedDB works in the iOS webview, so `sessions` can stay as it is), and pick it in `src/platform/index.ts` when `Capacitor.isNativePlatform()`.
 4. For music to keep playing with the screen locked, enable the Audio background mode in Xcode (Signing & Capabilities › Background Modes).
 5. `npx cap open ios` to build and run from Xcode.

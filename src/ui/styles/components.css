@@ -58,6 +58,36 @@ h4 { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: v
 #mixPresets:empty { display: none; }
 #mixPresets .del { margin-left: 6px; color: var(--mut); }
 
+.txt.task { display: block; width: 100%; }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
+.stat { padding: 12px; border-radius: 12px; background: rgba(255, 255, 255, .05); border: 1px solid var(--line); }
+.stat b { display: block; font-family: var(--mono); font-size: 24px; font-weight: 400; color: var(--txt); }
+.stat span { font-size: 11px; color: var(--mut); }
+
+/* One series, so one hue: the gauges' amber, with recessive labels and a hover or focus tooltip. */
+.bars { position: relative; display: flex; align-items: stretch; gap: 6px; height: 110px; margin: 30px 0 24px; border-bottom: 1px solid var(--line); }
+.bars.month { gap: 2px; }
+.bar { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: flex-end; outline-offset: 1px; }
+.bar i { display: block; min-height: 2px; border-radius: 4px 4px 0 0; background: var(--acc); opacity: .85; }
+.bar:hover i, .bar:focus-visible i { opacity: 1; }
+.bar span { position: absolute; left: 50%; bottom: -17px; transform: translateX(-50%); font-size: 10px; color: var(--mut); }
+.bar:hover::after, .bar:focus-visible::after {
+  content: attr(data-tip); position: absolute; z-index: 1; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+  padding: 5px 8px; border-radius: 8px; white-space: nowrap; font-size: 12px; color: var(--txt);
+  background: rgba(20, 23, 30, .96); border: 1px solid var(--line); pointer-events: none;
+}
+.bar:first-child:hover::after, .bar:first-child:focus-visible::after { left: 0; transform: none; }
+.bar:last-child:hover::after, .bar:last-child:focus-visible::after { left: auto; right: 0; transform: none; }
+
+.hist { list-style: none; font-size: 13px; color: #cfd5e2; }
+.hist li { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.hist li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist em { font-style: normal; font-size: 12px; color: var(--mut); }
+.hist.empty::before { content: attr(data-empty); font-size: 12px; color: var(--mut); }
+.stat-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.btn[data-armed] { border-color: rgba(255, 106, 69, .7); color: #ffb3a0; }
+
 .num { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; font-size: 14px; color: #cfd5e2; }
 .num .st { display: flex; align-items: center; gap: 10px; }
 .num .st button { width: 30px; height: 30px; border-radius: 8px; background: rgba(255, 255, 255, .07); border: 1px solid var(--line); }
@@ -94,6 +124,11 @@ h4 { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: v
   .start-card { width: min(680px, 100%); padding: 12px 18px; }
   .start-card h1 { font-size: 22px; display: inline; }
   .start-lead { display: inline; margin-left: 10px; font-size: 13px; }
+  .start-card > h4 { display: none; }
+  /* The presets become one row that scrolls sideways. */
+  #startPreset { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-top: 8px; }
+  #startPreset::-webkit-scrollbar { display: none; }
+  #startPreset button { flex: 0 0 auto; }
   .start-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
   .start-card h4 { margin: 8px 0 5px; }
   .start-card .seg button { padding: 6px 10px; }

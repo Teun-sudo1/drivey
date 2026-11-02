@@ -27,10 +27,9 @@ export const test = base.extend<{ pageErrors: string[] }>({
       await page.route(url => !isLocal(url.href), route => route.abort('internetdisconnected'));
       page.on('pageerror', e => errors.push(e.message));
       page.on('console', m => {
-        // The favicon arrives with the PWA icons in M5; failed outside requests are the faked network.
-        // Headless browsers have no sound card, which Chromium reports as an error.
+        // Failed outside requests are the faked network. Headless browsers have no sound card, which Chromium reports as an error.
         if (/audio device or the WebAudio renderer/.test(m.text())) return;
-        if (m.type() === 'error' && !/404/.test(m.text()) && isLocal(m.location().url || 'http://localhost/')) errors.push(m.text());
+        if (m.type() === 'error' && isLocal(m.location().url || 'http://localhost/')) errors.push(m.text());
       });
       await use(errors);
       expect(errors).toEqual([]);

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#03050b"/><stop offset=".52" stop-color="#16203a"/><stop offset=".6" stop-color="#2a2433"/><stop offset="1" stop-color="#07080b"/></linearGradient>
+<radialGradient id="glow"><stop offset="0" stop-color="#ffb46b" stop-opacity=".9"/><stop offset="1" stop-color="#ff8c32" stop-opacity="0"/></radialGradient>
+<radialGradient id="tail"><stop offset="0" stop-color="#ff4a3a"/><stop offset="1" stop-color="#ff2a1a" stop-opacity="0"/></radialGradient>
+<linearGradient id="road" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a1d26"/><stop offset="1" stop-color="#0d0f14"/></linearGradient>
+<linearGradient id="dash" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a0b0e"/><stop offset="1" stop-color="#020203"/></linearGradient>
+</defs>
+<rect width="512" height="512" rx="112" fill="url(#sky)"/>
+<path d="M240 290 L272 290 L470 512 L42 512 Z" fill="url(#road)"/>
+<path d="M240 290 L42 512 M272 290 L470 512" stroke="#ffb46b" stroke-opacity=".55" stroke-width="5"/>
+<path d="M256 300 L256 512" stroke="#e9edf5" stroke-opacity=".7" stroke-width="7" stroke-dasharray="14 18"/>
+<circle cx="80" cy="120" r="39.0" fill="url(#glow)"/><circle cx="80" cy="120" r="8.25" fill="#ffd9a3"/><circle cx="432" cy="120" r="39.0" fill="url(#glow)"/><circle cx="432" cy="120" r="8.25" fill="#ffd9a3"/><circle cx="150" cy="196" r="23.400000000000002" fill="url(#glow)"/><circle cx="150" cy="196" r="4.95" fill="#ffd9a3"/><circle cx="362" cy="196" r="23.400000000000002" fill="url(#glow)"/><circle cx="362" cy="196" r="4.95" fill="#ffd9a3"/><circle cx="190" cy="240" r="15.600000000000001" fill="url(#glow)"/><circle cx="190" cy="240" r="3.3000000000000003" fill="#ffd9a3"/><circle cx="322" cy="240" r="15.600000000000001" fill="url(#glow)"/><circle cx="322" cy="240" r="3.3000000000000003" fill="#ffd9a3"/><circle cx="212" cy="262" r="10.4" fill="url(#glow)"/><circle cx="212" cy="262" r="2.2" fill="#ffd9a3"/><circle cx="300" cy="262" r="10.4" fill="url(#glow)"/><circle cx="300" cy="262" r="2.2" fill="#ffd9a3"/>
+<circle cx="240" cy="306" r="16" fill="url(#tail)"/><circle cx="272" cy="306" r="16" fill="url(#tail)"/>
+<circle cx="240" cy="306" r="3.5" fill="#ff6a50"/><circle cx="272" cy="306" r="3.5" fill="#ff6a50"/>
+<path d="M0 420 Q256 380 512 420 L512 512 L0 512 Z" fill="url(#dash)"/>
+<path d="M150 512 A106 106 0 0 1 362 512" fill="none" stroke="#25272d" stroke-width="22"/>
+<path d="M60 440 Q256 404 452 440" fill="none" stroke="#ffb46b" stroke-opacity=".18" stroke-width="2"/>
+</svg>

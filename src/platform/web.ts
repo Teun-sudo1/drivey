@@ -1,3 +1,4 @@
+import { createSessionDb } from './sessionDb';
 import type { KeepAwake, KeyValueStorage, Platform } from './types';
 
 const storage: KeyValueStorage = {
@@ -56,6 +57,24 @@ function createWakeLock(): KeepAwake {
   };
 }
 
+function saveFile(name: string, text: string): void {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/** Caches the app so it opens without a network. Built files only: the dev server changes too often. */
+function enableOffline(): void {
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+  // After the page has loaded, so caching doesn't compete with the first visit's own downloads.
+  const register = (): void => void navigator.serviceWorker.register('./sw.js').catch(() => undefined);
+  if (document.readyState === 'complete') register();
+  else addEventListener('load', register);
+}
+
 export function createWebPlatform(): Platform {
-  return { storage, keepAwake: createWakeLock() };
+  enableOffline();
+  return { storage, keepAwake: createWakeLock(), sessions: createSessionDb(), saveFile };
 }

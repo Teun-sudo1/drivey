@@ -94,4 +94,13 @@ describe('Pomodoro', () => {
     timer.reset();
     expect(timer.remainingMs).toBe(50 * MIN);
   });
+
+  it('reports the length the ended phase ran with, not a later edit', () => {
+    timer.start();
+    config = { ...config, focus: 50 };
+    timer.syncDurations();
+    time += 25 * MIN;
+    timer.tick();
+    expect(ends[0]).toMatchObject({ ended: 'focus', minutes: 25 });
+  });
 });

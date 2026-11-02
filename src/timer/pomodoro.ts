@@ -14,6 +14,8 @@ export interface PhaseEnd {
   ended: Phase;
   next: Phase;
   endedAt: number;
+  /** How long the ended phase ran, which a duration edit mid-phase doesn't change. */
+  minutes: number;
 }
 
 type Listener<T> = (value: T) => void;
@@ -29,6 +31,7 @@ export class Pomodoro {
   completedFocus = 0;
 
   private endAt = 0;
+  private lengthMs: number;
   /** True until the current phase is first started; only then may a duration edit apply to it. */
   private fresh = true;
   private readonly changeListeners = new Set<() => void>();
@@ -38,7 +41,7 @@ export class Pomodoro {
     private readonly config: () => PomodoroConfig,
     private readonly now: () => number = Date.now
   ) {
-    this.remainingMs = this.phaseLength(this.phase);
+    this.lengthMs = this.remainingMs = this.phaseLength(this.phase);
   }
 
   onChange(listener: () => void): void {
@@ -83,7 +86,7 @@ export class Pomodoro {
   }
 
   syncDurations(): void {
-    if (this.fresh) this.remainingMs = this.phaseLength(this.phase);
+    if (this.fresh) this.lengthMs = this.remainingMs = this.phaseLength(this.phase);
     this.notify();
   }
 
@@ -100,6 +103,7 @@ export class Pomodoro {
   private completePhase(now: number): void {
     const ended = this.phase;
     const endedAt = this.endAt;
+    const minutes = this.lengthMs / 60_000;
     let next: Phase = 'focus';
     if (ended === 'focus') {
       this.completedFocus++;
@@ -114,12 +118,12 @@ export class Pomodoro {
     } else {
       this.running = false;
     }
-    for (const listener of this.phaseEndListeners) listener({ ended, next, endedAt });
+    for (const listener of this.phaseEndListeners) listener({ ended, next, endedAt, minutes });
   }
 
   private enterPhase(phase: Phase): void {
     this.phase = phase;
-    this.remainingMs = this.phaseLength(phase);
+    this.lengthMs = this.remainingMs = this.phaseLength(phase);
     this.fresh = true;
   }
 

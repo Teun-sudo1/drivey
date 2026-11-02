@@ -1,6 +1,7 @@
 import { CHANNELS, type Mix } from '../audio/audioEngine';
 import { clamp } from '../lib/math';
 import { STYLES, type StyleId } from '../music/styles';
+import { MAX_TASK } from '../stats/sessions';
 import type { KeyValueStorage } from '../platform/types';
 import { ROUTES, type RouteId } from '../routes';
 import { TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from '../weather/tables';
@@ -38,6 +39,8 @@ export interface Settings {
   /** Whether music plays once the engine is running. */
   musicOn: boolean;
   mixerPresets: MixerPreset[];
+  /** What the user is focusing on; stored with each session they finish. */
+  task: string;
 }
 
 export type DurationKey = 'focus' | 'short' | 'long' | 'every';
@@ -74,7 +77,8 @@ function defaults(): Settings {
     follow: true,
     muted: false,
     musicOn: true,
-    mixerPresets: []
+    mixerPresets: [],
+    task: ''
   };
 }
 
@@ -111,6 +115,7 @@ function sanitize(stored: unknown): Settings {
       return typeof preset?.name === 'string' && preset.name.trim() && mix ? [{ name: preset.name.trim().slice(0, MAX_PRESET_NAME), mix }] : [];
     }).slice(0, MAX_PRESETS);
   }
+  if (typeof raw.task === 'string') s.task = raw.task.slice(0, MAX_TASK);
   for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow', 'follow', 'muted', 'musicOn'] as const) {
     const v = raw[k];
     if (typeof v === 'boolean') s[k] = v;

@@ -33,7 +33,7 @@ body.reduced #grain { animation: none; }
   font-family: var(--mono); font-size: min(24vw, 150px); line-height: 1; letter-spacing: .02em;
   text-shadow: 0 0 30px rgba(255, 180, 107, .25), 0 2px 18px rgba(0, 0, 0, .6);
 }
-#sub { margin-top: 10px; font-size: 13px; color: rgba(233, 237, 245, .65); text-shadow: 0 1px 8px rgba(0, 0, 0, .8); }
+#sub { margin: 10px auto 0; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: rgba(233, 237, 245, .65); text-shadow: 0 1px 8px rgba(0, 0, 0, .8); }
 #controls {
   position: absolute; display: flex; align-items: center; gap: 14px;
   left: 50%; bottom: calc(22px + var(--sb)); transform: translateX(-50%);

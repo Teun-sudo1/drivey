@@ -11,6 +11,7 @@ import { AudioEngine } from './audio/audioEngine';
 import { Effects } from './audio/effects';
 import { CarEngine } from './app/carEngine';
 import { startLoop } from './app/loop';
+import { SCENE_PRESETS, matchingPreset } from './app/scenePresets';
 import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type ToggleKey } from './app/settings';
 import { MusicPlayer } from './music/player';
 import { getPlatform } from './platform';
@@ -34,6 +35,8 @@ import { createIdleFade } from './ui/idle';
 import { bindDashVolume } from './ui/dashVolume';
 import { bindShortcuts } from './ui/shortcuts';
 import { createSoundPanel } from './ui/soundPanel';
+import { createStatsPanel } from './ui/statsPanel';
+import { bindTask } from './ui/task';
 import { createStartScreen } from './ui/startScreen';
 import { toast } from './ui/toast';
 import { mountSegmented, mountStepper, mountSwitch } from './ui/widgets';
@@ -99,8 +102,13 @@ applyMusic();
 const timer = new Pomodoro(() => settings.value);
 startTimerDriver(timer);
 timer.onChange(() => platform.keepAwake.set(timer.running));
-timer.onPhaseEnd(({ next }) => {
+const stats = createStatsPanel(platform.sessions, platform.saveFile);
+timer.onPhaseEnd(({ ended, next, endedAt, minutes }) => {
   effects.chime();
+  if (ended === 'focus') {
+    const { task, route, tod, weather } = settings.value;
+    stats.record({ endedAt, minutes, task: task.trim(), route, tod, weather }).catch(() => toast('This session couldn’t be saved'));
+  }
   toast(next === 'focus' ? 'Break over. Back on the road.' : 'Nice work. Time for a break.');
 });
 
@@ -108,10 +116,14 @@ timer.onPhaseEnd(({ next }) => {
 const hud = createHud(
   timer,
   () => settings.value.every,
-  () => `${ROUTES[settings.value.route].name} · ${TIMES_OF_DAY[settings.value.tod].name} · ${WEATHERS[settings.value.weather].name}`,
+  // The task, once there is one, says more than the scene the driver can already see.
+  () => settings.value.task.trim() || `${ROUTES[settings.value.route].name} · ${TIMES_OF_DAY[settings.value.tod].name} · ${WEATHERS[settings.value.weather].name}`,
   (txt, label) => cockpit.showTime(txt, label)
 );
-const surface = createControlSurface(() => idle.wake());
+// The stats tab re-reads the clock when opened, in case midnight has passed.
+const surface = createControlSurface(() => idle.wake(), tab => {
+  if (tab === 'stats') stats.render();
+});
 const topBar = $('#top');
 stage.onResize(() => stage.setMirrorTop(topBar.getBoundingClientRect().bottom + MIRROR_GAP_PX));
 const idle = createIdleFade(() => timer.running && !surface.isOpen());
@@ -135,13 +147,21 @@ bindShortcuts({
 
 const options = <T extends string>(table: Record<T, { name: string }>) => (Object.keys(table) as T[]).map(k => [k, table[k].name] as const);
 // The same controls appear on the start screen and in settings, so changes refresh both.
+const presetNames = SCENE_PRESETS.map(p => [p.name, p.name] as const);
 const sceneControls = [
+  ...[$('#segPreset'), $('#startPreset')].map(el =>
+    mountSegmented<string>(el, presetNames, () => matchingPreset(settings.value)?.name ?? '', name => {
+      const { route, tod, weather, style } = SCENE_PRESETS.find(p => p.name === name)!;
+      settings.update({ route, tod, weather, style });
+    })
+  ),
   ...[$('#segRoute'), $('#startRoute')].map(el => mountSegmented<RouteId>(el, options(ROUTES), () => settings.value.route, route => settings.update({ route }))),
   ...[$('#segSide'), $('#startSide')].map(el => mountSegmented<DriveSide>(el, [['left', 'Left'], ['right', 'Right']], () => settings.value.driveSide, driveSide => settings.update({ driveSide }))),
   ...[$('#segTod'), $('#startTod')].map(el => mountSegmented<TimeOfDayId>(el, options(TIMES_OF_DAY), () => settings.value.tod, tod => settings.update({ tod }))),
   ...[$('#segWeather'), $('#startWeather')].map(el => mountSegmented<WeatherId>(el, options(WEATHERS), () => settings.value.weather, weather => settings.update({ weather })))
 ];
 const refreshSoundPanel = createSoundPanel(settings, player);
+const refreshTask = bindTask(settings);
 const showDashVolume = bindDashVolume($<HTMLCanvasElement>('#gl'), stage.camera, cockpit.fader, $<HTMLInputElement>('#dashVolume'), music => settings.update({ mix: { ...settings.value.mix, music } }));
 function applyVolume(): void {
   cockpit.volume = settings.value.mix.music;
@@ -153,6 +173,7 @@ settings.onChange(() => {
   hud.render();
   for (const refresh of sceneControls) refresh();
   refreshSoundPanel();
+  refreshTask();
 });
 
 for (const row of document.querySelectorAll<HTMLElement>('.tog')) {
@@ -243,5 +264,5 @@ startLoop(dt => {
 
 // Lets the browser tests read scene state. Compiled out of the public build.
 if (import.meta.env.MODE === 'e2e') {
-  Object.assign(window, { __drivey: { simulate, engine, startScreen, stage, postfx, pool, backdrop, traffic, cockpit, drive, audio, ambience, effects, player, environment, particles, windshield, roadSurface, timer, settings } });
+  Object.assign(window, { __drivey: { simulate, engine, startScreen, stage, postfx, pool, backdrop, traffic, cockpit, drive, audio, ambience, effects, player, stats, environment, particles, windshield, roadSurface, timer, settings } });
 }

@@ -15,7 +15,9 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: `http://localhost:${PORT}/`,
-    screenshot: 'only-on-failure'
+    screenshot: 'only-on-failure',
+    // Each test is a fresh visitor; only the offline test lets the app install its cache.
+    serviceWorkers: 'block'
   },
   webServer: {
     command: `npm run build:e2e && npx vite preview --outDir dist-e2e --port ${PORT} --strictPort`,

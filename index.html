@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
+<meta name="description" content="A focus timer on a calm night drive.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Drivey">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <title>Drivey</title>
 </head>
 <body class="parked">
@@ -29,11 +37,13 @@
 
 <div id="panel" class="hidden" aria-label="Settings" inert>
   <div class="tabs">
-    <button data-tab="timer" class="on">Timer</button><button data-tab="scene">Scene</button><button data-tab="sound">Sound</button>
+    <button data-tab="timer" class="on">Timer</button><button data-tab="scene">Scene</button><button data-tab="sound">Sound</button><button data-tab="stats">Stats</button>
     <button class="x" id="btnClose" aria-label="Close settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="body">
     <section id="tab-timer" class="on">
+      <h4>Current task</h4>
+      <input class="txt task" id="taskIn" placeholder="What are you focusing on?" maxlength="80" aria-label="Current task" enterkeyhint="done">
       <h4>Durations (minutes)</h4>
       <div class="num" data-n="focus">Focus</div>
       <div class="num" data-n="short">Short break</div>
@@ -45,6 +55,8 @@
       <p class="note">Keys: Space start/pause · M mute · F fullscreen · H hide UI</p>
     </section>
     <section id="tab-scene">
+      <h4>Presets</h4>
+      <div class="seg" id="segPreset" aria-label="Scene presets"></div>
       <h4>Route</h4>
       <div class="seg" id="segRoute" aria-label="Route"></div>
       <h4>Drive on the</h4>
@@ -89,6 +101,25 @@
         <button class="btn" type="submit">Save</button>
       </form>
     </section>
+    <section id="tab-stats">
+      <div class="stats">
+        <div class="stat"><b id="stToday">0</b><span>min today</span></div>
+        <div class="stat"><b id="stWeek">0</b><span>min, last 7 days</span></div>
+        <div class="stat"><b id="stStreak">0</b><span>day streak</span></div>
+      </div>
+      <h4>Focus minutes</h4>
+      <div class="seg" id="segRange" aria-label="Chart range"></div>
+      <div class="bars" id="bars" role="list" aria-label="Focus minutes per day"></div>
+      <h4>Recent sessions</h4>
+      <ul class="hist" id="hist" data-empty="No sessions yet. Finish a focus block to see it here."></ul>
+      <div class="stat-actions">
+        <button class="btn" id="btnExport">Export</button>
+        <button class="btn" id="btnImport">Import</button>
+        <button class="btn" id="btnClear">Clear history</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
+      <p class="note">Sessions stay on this device. Export them to keep a copy or move them to another device.</p>
+    </section>
   </div>
 </div>
 
@@ -100,6 +131,8 @@
   <div class="start-card" id="startSetup">
     <h1>DRIVEY</h1>
     <p class="start-lead">Set up your drive, then start the engine</p>
+    <h4>Quick start</h4>
+    <div class="seg" id="startPreset" aria-label="Scene presets"></div>
     <div class="start-fields">
       <div><h4>Route</h4><div class="seg" id="startRoute" aria-label="Route"></div></div>
       <div><h4>Drive on the</h4><div class="seg" id="startSide" aria-label="Drive on the"></div></div>

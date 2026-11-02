@@ -6,7 +6,7 @@ export interface ControlSurface {
   toggle(open?: boolean): void;
 }
 
-export function createControlSurface(onToggle: () => void): ControlSurface {
+export function createControlSurface(onToggle: () => void, onTab: (tab: string) => void): ControlSurface {
   const panel = $('#panel');
   const isOpen = (): boolean => !panel.classList.contains('hidden');
   const toggle = (open = !isOpen()): void => {
@@ -23,6 +23,7 @@ export function createControlSurface(onToggle: () => void): ControlSurface {
     tab.addEventListener('click', () => {
       for (const t of tabs) t.classList.toggle('on', t === tab);
       for (const s of panel.querySelectorAll('section')) s.classList.toggle('on', s.id === `tab-${tab.dataset.tab}`);
+      onTab(tab.dataset.tab!);
     });
   }
   $('#btnPanel').addEventListener('click', () => toggle());
