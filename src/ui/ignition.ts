@@ -13,7 +13,10 @@ const SPRING_SPEED = 300;
 const AUTO_TURN_SPEED = 130;
 /** Below this much turning a press counts as a tap, not a drag. */
 const DRAG_THRESHOLD = 4;
-const MAX_DT = 0.05;
+/** Real time is used, so the key takes as long on a slow device; this only caps a stall, like a hidden tab. */
+const MAX_DT = 0.25;
+/** The tag's spring is only stable in small steps, so a long frame is split up. */
+const TAG_STEP = 1 / 120;
 /** Where the tag's ring hangs from, on the key's bow, as distance from the barrel's centre. */
 const TAG_ANCHOR = 66;
 const TAG_STIFFNESS = 26;
@@ -62,8 +65,11 @@ export function createIgnition(button: HTMLElement, keyBody: SVGElement, keyTag:
   /** The tag hangs from the bow under gravity, and swings when the key moves. */
   function swingTag(dt: number, keySpeed: number): void {
     const reduced = document.body.classList.contains('reduced');
-    tagVelocity += (-TAG_STIFFNESS * tagSwing - TAG_DAMPING * tagVelocity - keySpeed * TAG_THROW * TAG_STIFFNESS) * dt;
-    tagSwing += tagVelocity * dt;
+    const steps = Math.ceil(dt / TAG_STEP), h = dt / Math.max(1, steps);
+    for (let i = 0; i < steps; i++) {
+      tagVelocity += (-TAG_STIFFNESS * tagSwing - TAG_DAMPING * tagVelocity - keySpeed * TAG_THROW * TAG_STIFFNESS) * h;
+      tagSwing += tagVelocity * h;
+    }
     const radians = (angle * Math.PI) / 180;
     const x = Math.sin(radians) * TAG_ANCHOR, y = -Math.cos(radians) * TAG_ANCHOR;
     keyTag.setAttribute('transform', `translate(${x} ${y}) rotate(${reduced ? 0 : (tagSwing * 180) / Math.PI})`);

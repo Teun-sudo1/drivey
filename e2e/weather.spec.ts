@@ -91,7 +91,12 @@ test.describe('windshield', () => {
     expect(await page.evaluate(() => window.__drivey.windshield.drops.length)).toBeGreaterThan(0);
     await advance(page, 8);
     expect(await page.evaluate(() => window.__drivey.windshield.drops.length)).toBe(0);
-    expect(await glassPixels(page)).toBe(0);
+    // Once seen only on a slow CI machine; the state says what was still being drawn.
+    const state = await page.evaluate(() => {
+      const w = window.__drivey.windshield;
+      return JSON.stringify({ drops: w.drops.length, veil: w.veil, angle: w.wiperAngle, period: w.wiperPeriod, phase: w.wiperPhase, motion: w.wiperMotion, wet: w.wetGlass });
+    });
+    expect(await glassPixels(page), state).toBe(0);
   });
 
   test('no water film stays behind if the weather clears just as a wipe ends', async ({ page }) => {
