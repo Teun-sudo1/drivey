@@ -1,4 +1,4 @@
-import { advance, expect, isPortrait, mirrorRect, openApp, openSceneTab, overlaps, test, textRect, update } from './support';
+import { advance, brightnessAt, expect, isPortrait, mirrorRect, openApp, openSceneTab, overlaps, test, textRect, update } from './support';
 
 const rectOf = async (page: any, selector: string) => {
   const b = (await page.locator(selector).boundingBox())!;
@@ -77,6 +77,42 @@ test('the dashboard display is fully on screen in landscape', async ({ page }) =
   });
   expect(Math.min(...edges)).toBeGreaterThan(-1);
   expect(Math.max(...edges)).toBeLessThan(1);
+});
+
+test('the gear lever shows between the radio and the wheel in landscape', async ({ page }) => {
+  test.skip(isPortrait(page), 'portrait crops the lower dashboard to the wheel');
+  await openApp(page, { tod: 'day', weather: 'clear' });
+  await advance(page, 2);
+  await page.waitForFunction(() => window.__drivey.stage.settled);
+  const { knob, radius, radio } = await page.evaluate(() => {
+    const { cockpit, stage } = window.__drivey;
+    stage.camera.updateMatrixWorld(true);
+    const toScreen = (object: any, p: any) => {
+      const v = object.localToWorld(p.clone()).project(stage.camera);
+      return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
+    };
+    const ball = cockpit.gearLever.children[2];
+    const centre = toScreen(ball, ball.position.clone().set(0, 0, 0));
+    const r = ball.geometry.parameters.radius;
+    const side = toScreen(ball, ball.position.clone().set(r, 0, 0));
+    const corners = cockpit.radio.outline.map((p: any) => toScreen(cockpit.radio.group, p));
+    const xs = corners.map((c: any) => c.x), ys = corners.map((c: any) => c.y);
+    return {
+      knob: centre,
+      radius: Math.abs(side.x - centre.x),
+      radio: { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) }
+    };
+  });
+  // Its upper half is in view, clear of the radio and left of the wheel's hub.
+  expect(knob.y).toBeLessThan(page.viewportSize()!.height - radius * 0.2);
+  expect(knob.x - radius * 0.6).toBeGreaterThan(radio.right);
+  expect(knob.x).toBeLessThan(page.viewportSize()!.width / 2);
+  // And nothing in front hides it: by day, its dark shape stands out against the lit dash behind.
+  const at = { x: knob.x, y: knob.y - radius * 0.3 };
+  const shown = await brightnessAt(page, at.x, at.y, radius * 0.3);
+  await page.evaluate(() => (window.__drivey.cockpit.gearLever.visible = false));
+  const hidden = await brightnessAt(page, at.x, at.y, radius * 0.3);
+  expect(Math.abs(shown - hidden)).toBeGreaterThan(10);
 });
 
 test.describe('driving side', () => {

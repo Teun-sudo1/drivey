@@ -19,6 +19,8 @@ const DIAL_RATE = 5;
 /** Full brightness of the gauges, LCD, nav screen and radio. */
 const SCREEN_LEVELS = [1, 1, 0.73, 1];
 const PILLAR_WIDTH = 0.11;
+/** Where the lever leaves the console, how far it leans back, and its reach up into the gap between radio and wheel. */
+const GEAR_LEVER = { x: -0.22, y: -0.78, z: -0.78, lean: 0.25, length: 0.5, knob: 0.036 };
 
 /** Part of the interior that sits in front of the windshield, as a polygon local to `object`. */
 export interface GlassOccluder {
@@ -33,6 +35,8 @@ export class Cockpit {
   readonly passLight = new THREE.PointLight(0xffffff, 0, 1.7, 1.5);
   readonly roof = new THREE.Group();
   readonly wheel = new THREE.Group();
+  /** The long 80s lever, rising between the seats into the lower corner of the view. */
+  readonly gearLever: THREE.Group;
   readonly mirror: Mirror;
   readonly radio: CarRadio;
   /** What the radio shows; the dial eases to the station on its own. */
@@ -91,6 +95,8 @@ export class Cockpit {
     mesh(new THREE.TorusGeometry(0.2, 0.024, 12, 48), intA, 0, 0, 0, 1, 1, 1, this.wheel);
     mesh(BOX, intB, 0, -0.02, 0, 0.34, 0.035, 0.02, this.wheel);
     mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.05, 20), intA, 0, -0.02, 0, 1, 1, 1, this.wheel).rotation.x = Math.PI / 2;
+
+    this.gearLever = this.addGearLever(root, intA, intB);
 
     root.add(this.roof);
     mesh(BOX, intB, -0.35, 0.52, -0.82, 2.8, 0.07, 0.55, this.roof);
@@ -193,6 +199,20 @@ export class Cockpit {
     if (this.engine === 'running') return 1.1 + kmh / 45 + Math.sin(clock * 3) * 0.03;
     if (this.engine === 'cranking') return 0.5 + Math.abs(Math.sin(clock * 22)) * 0.5;
     return sweep * 8;
+  }
+
+  /** Rod, rubber boot and knob, leaning back towards the driver from the console. */
+  private addGearLever(root: THREE.Group, material: THREE.Material, dark: THREE.Material): THREE.Group {
+    const lever = new THREE.Group();
+    lever.position.set(GEAR_LEVER.x, GEAR_LEVER.y, GEAR_LEVER.z);
+    lever.rotation.x = GEAR_LEVER.lean;
+    root.add(lever);
+    mesh(new THREE.ConeGeometry(0.075, 0.16, 12, 1, true), dark, 0, 0.08, 0, 1, 1, 1, lever);
+    mesh(new THREE.CylinderGeometry(0.009, 0.011, GEAR_LEVER.length, 8), material, 0, GEAR_LEVER.length / 2, 0, 1, 1, 1, lever);
+    // Polished, so it catches the dash glow and passing lights where everything else is matte.
+    const knob = new THREE.MeshStandardMaterial({ color: 0x2c2c31, roughness: 0.3, metalness: 0.4 });
+    mesh(new THREE.SphereGeometry(GEAR_LEVER.knob, 16, 12), knob, 0, GEAR_LEVER.length, 0, 1, 0.9, 1, lever);
+    return lever;
   }
 
   /** The A-pillars, returning each one's outline plus everything beyond it, where the glass ends. */
