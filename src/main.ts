@@ -12,7 +12,7 @@ import { Effects } from './audio/effects';
 import { CarEngine } from './app/carEngine';
 import { startLoop } from './app/loop';
 import { SCENE_PRESETS, matchingPreset } from './app/scenePresets';
-import { QUALITY, resolveQuality, type QualityId } from './app/quality';
+import { FrameWatch, QUALITY, lowerQuality, resolveQuality, type QualityId, type QualityLevel } from './app/quality';
 import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type ToggleKey } from './app/settings';
 import { MusicPlayer } from './music/player';
 import { getPlatform } from './platform';
@@ -31,7 +31,7 @@ import { startTimerDriver } from './timer/driver';
 import { Pomodoro } from './timer/pomodoro';
 import { createControlSurface } from './ui/controlSurface';
 import { $ } from './ui/dom';
-import { toggleFullscreen } from './ui/fullscreen';
+import { canFullscreen, toggleFullscreen } from './ui/fullscreen';
 import { createHud, phaseName } from './ui/hud';
 import { createIdleFade } from './ui/idle';
 import { bindDashRadio } from './ui/dashRadio';
@@ -79,20 +79,19 @@ const environment = new Environment(stage, lights, postfx, cockpit, backdrop, pa
 const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera, cockpit.roof, cockpit.glassOccluders, cockpit.sideWindows, route.lampTint);
 settings.onChange(() => stage.setPov(settings.value.pov));
 stage.setPov(settings.value.pov, true);
-// The first visit picks a seat behind steamed-up glass, so the scenery is still a surprise.
-windshield.setMisted(!settings.value.seatPicked, true);
-cockpit.setCabinLight(!settings.value.seatPicked);
-const startScreen = createStartScreen(engine, {
-  needed: !settings.value.seatPicked,
-  done: () => {
-    settings.update({ pov: stage.povFor(), seatPicked: true });
-    windshield.setMisted(false);
-    cockpit.setCabinLight(false);
-  }
+// Each visit starts by settling into the seat behind steamed-up glass, so the scenery is a surprise.
+windshield.setMisted(true, true);
+cockpit.setCabinLight(true);
+cockpit.setNavLoading(true);
+const startScreen = createStartScreen(engine, instantly => {
+  settings.update({ pov: stage.povFor() });
+  windshield.setMisted(false, instantly);
+  cockpit.setCabinLight(false);
+  cockpit.setNavLoading(false);
 });
 
 /* Sound */
-const audio = new AudioEngine();
+const audio = new AudioEngine(platform.playInBackground);
 const ambience = new Ambience(audio);
 const effects = new Effects(audio);
 const player = new MusicPlayer(audio);
@@ -180,6 +179,7 @@ $('#btnSkip').addEventListener('click', () => {
   timer.skip();
   toast(`Skipped to ${phaseName(timer.phase).toLowerCase()}`);
 });
+$('#btnFull').hidden = !canFullscreen();
 $('#btnFull').addEventListener('click', () => void toggleFullscreen());
 bindShortcuts({
   togglePlay: () => {
@@ -250,15 +250,29 @@ for (const row of document.querySelectorAll<HTMLElement>('.num')) {
 
 /** Resolution, reflection, particles and bloom, scaled together by the quality setting. */
 const touchScreen = matchMedia('(pointer: coarse)').matches;
-let quality = QUALITY.high;
+let quality = QUALITY.high, qualityLevel: QualityLevel = 'high';
+/** Auto's ceiling, lowered for the rest of the visit if this device can't keep up. */
+let autoCap: QualityLevel = 'high';
+const frameWatch = new FrameWatch();
 function applyQuality(): void {
-  quality = QUALITY[resolveQuality(settings.value.quality, touchScreen)];
+  qualityLevel = resolveQuality(settings.value.quality, touchScreen, autoCap);
+  quality = QUALITY[qualityLevel];
   stage.setMaxPixelRatio(quality.pixelRatio);
   roadSurface.setDetail(quality.reflection);
   particles.budget = quality.particles;
 }
 settings.onChange(applyQuality);
 applyQuality();
+settings.onChange(() => frameWatch.reset());
+/** On Auto, steps down a level when frames stay slow. */
+function watchFrames(dt: number): void {
+  if (settings.value.quality !== 'auto' || !frameWatch.note(dt)) return;
+  const lower = lowerQuality(qualityLevel);
+  if (!lower) return;
+  autoCap = lower;
+  applyQuality();
+  toast(`Graphics set to ${quality.name} to keep the drive smooth`);
+}
 
 function applyBodyFlags(): void {
   const { grain, vignette, reduced } = settings.value;
@@ -333,6 +347,7 @@ function simulate(dt: number): void {
 
 startLoop(dt => {
   simulate(dt);
+  watchFrames(dt);
   const s = settings.value;
   // Once a frame rather than per simulated step, as each call schedules audio changes.
   ambience.update({ dt, weather: WEATHERS[s.weather], route: s.route, speed: drive.speed, engine: engine.state, mix: s.mix, follow: s.follow, shelter });

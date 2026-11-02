@@ -49,8 +49,6 @@ export interface Settings {
   tipsSeen: boolean;
   /** Where the driver sits, from 0 close to the wheel to 1 sat back; null sits close on a phone and back on bigger screens. */
   pov: number | null;
-  /** Whether the first visit's choice of seat has been made. */
-  seatPicked: boolean;
 }
 
 
@@ -93,8 +91,7 @@ function defaults(): Settings {
     quality: 'auto',
     followSession: true,
     tipsSeen: false,
-    pov: null,
-    seatPicked: false
+    pov: null
   };
 }
 
@@ -137,7 +134,7 @@ function sanitize(stored: unknown): Settings {
   const { seat } = stored as { seat?: unknown };
   if (seat === 'close' || seat === 'back') s.pov = seat === 'back' ? 1 : 0;
   if (typeof raw.task === 'string') s.task = raw.task.slice(0, MAX_TASK);
-  for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow', 'follow', 'muted', 'musicOn', 'tipsSeen', 'seatPicked', 'followSession'] as const) {
+  for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow', 'follow', 'muted', 'musicOn', 'tipsSeen', 'followSession'] as const) {
     const v = raw[k];
     if (typeof v === 'boolean') s[k] = v;
   }

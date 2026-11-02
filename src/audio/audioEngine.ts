@@ -27,6 +27,9 @@ export class AudioEngine {
   private muted = false;
   private readonly readyListeners: ((graph: AudioGraph) => void)[] = [];
 
+  /** `beforeStart` runs once, inside the first gesture, just before the context is made. */
+  constructor(private readonly beforeStart: () => void) {}
+
   get isMuted(): boolean {
     return this.muted;
   }
@@ -39,11 +42,8 @@ export class AudioEngine {
     }
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return;
-    // Safari's audio session: as playback, iOS keeps the sound going with the screen locked or
-    // another app in front, like a music player, so the chime still rings at the end of a phase.
-    // It also plays through the ring/silent switch, as music apps do.
-    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
-    if (session) session.type = 'playback';
+    // So the chime still rings at the end of a phase with the screen locked.
+    this.beforeStart();
     const ctx = new Ctx();
     void ctx.resume();
     const master = ctx.createGain();

@@ -85,7 +85,7 @@ With "Scene follows the session" on (Settings › Timer), the light moves on as 
 
 ## Quality
 
-Settings › Scene › Graphics has Auto, Low, Medium and High. They scale the rendering resolution, the size of the wet-road reflection (off on Low), the number of rain and snow particles, and whether bloom may run. Auto picks Medium on phones and tablets and High on computers.
+Settings › Scene › Graphics has Auto, Low, Medium and High. They scale the rendering resolution, the size of the wet-road reflection (off on Low), the number of rain and snow particles, and whether bloom may run. Auto picks Medium on phones and tablets and High on computers, and if frames stay below about 40 fps for a few seconds it steps down a level for the rest of the visit, with a short note on screen.
 
 ## Keyboard shortcuts
 
@@ -111,7 +111,7 @@ Settings › Scene › Graphics has Auto, Low, Medium and High. They scale the r
 | `src/timer` | Timestamp-based Pomodoro and its driver |
 | `src/stats` | Session records, daily totals and streak, the export format |
 | `src/ui` | Start screen and key, HUD, settings panel, shortcuts, styles |
-| `src/platform` | Browser adapter (settings, session database, keep-awake, file saving, offline); a Capacitor implementation plugs in here |
+| `src/platform` | Browser adapter (settings, session database, keep-awake, file saving, background audio, offline); a Capacitor implementation plugs in here |
 | `src/sw.ts`, `tools/` | The offline service worker and the build step that fills in its file list |
 | `public` | Manifest, favicon and app icons |
 | `src/lib` | Small shared helpers |
@@ -151,10 +151,18 @@ Live at <https://teun-sudo1.github.io/drivey/>.
 
 ## Wrapping for iOS with Capacitor
 
-The app is built to be wrapped without rewrites: assets use relative paths, and storage, the session database, keep-awake and file saving go through `src/platform/`. The service worker is for the web only; a native shell has its files on the device already.
+The app is built to be wrapped without rewrites: assets use relative paths, and storage, the session database, keep-awake, file saving and the background audio session go through `src/platform/`, and `src/platform/boundary.test.ts` fails if those browser features are used anywhere else. The service worker is for the web only; a native shell has its files on the device already.
+
+Readiness, as checked for M6:
+
+- Relative asset paths (`base: './'`), so the files load from the app bundle.
+- `viewport-fit=cover` and safe-area insets on every edge, for the notch and home indicator.
+- No fullscreen button where the web view has no fullscreen API; a native shell is fullscreen already.
+- Sound starts from a tap, as WKWebView requires, and asks to keep playing in the background through `Platform.playInBackground`.
+- Everything else (WebGL 2, Web Audio, IndexedDB, canvas) is standard in WKWebView on iOS 15 and later.
 
 1. `npm install @capacitor/core @capacitor/cli @capacitor/ios`, then `npx cap init Drivey com.example.drivey --web-dir dist`.
 2. `npm run build`, then `npx cap add ios` and `npx cap sync ios`.
-3. Write `src/platform/capacitor.ts` implementing `Platform` with `@capacitor/preferences` for `storage`, `@capacitor-community/keep-awake` for `keepAwake`, and `@capacitor/filesystem` with `@capacitor/share` for `saveFile` (IndexedDB works in the iOS webview, so `sessions` can stay as it is), and pick it in `src/platform/index.ts` when `Capacitor.isNativePlatform()`.
+3. Write `src/platform/capacitor.ts` implementing `Platform` with `@capacitor/preferences` for `storage`, `@capacitor-community/keep-awake` for `keepAwake`, and `@capacitor/filesystem` with `@capacitor/share` for `saveFile`, and a no-op `playInBackground` (the background mode below does that job) (IndexedDB works in the iOS webview, so `sessions` can stay as it is), and pick it in `src/platform/index.ts` when `Capacitor.isNativePlatform()`.
 4. For music to keep playing with the screen locked, enable the Audio background mode in Xcode (Signing & Capabilities › Background Modes).
 5. `npx cap open ios` to build and run from Xcode.

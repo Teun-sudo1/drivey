@@ -73,19 +73,25 @@ export const isPhone = (page: Page): boolean => Math.min(page.viewportSize()!.wi
 export async function openApp(page: Page, settings: Record<string, unknown> = {}): Promise<void> {
   await page.addInitScript(s => {
     if (!localStorage.getItem('nd.settings')) localStorage.setItem('nd.settings', JSON.stringify(s));
-  }, { bloom: false, grain: false, vignette: false, tipsSeen: true, seatPicked: true, ...settings });
+  }, { bloom: false, grain: false, vignette: false, tipsSeen: true, ...settings });
   await page.goto('./');
   await waitForFrames(page);
   await page.evaluate(() => window.__drivey.startScreen.skip());
 }
 
-/** Opens the app as a visitor does: parked on the start screen. */
-export async function openParked(page: Page, settings: Record<string, unknown> = {}): Promise<void> {
+/** Opens the app as a visitor does: parked, in the seat behind steamed-up glass. */
+export async function openSeat(page: Page, settings: Record<string, unknown> = {}): Promise<void> {
   await page.addInitScript(s => {
     if (!localStorage.getItem('nd.settings')) localStorage.setItem('nd.settings', JSON.stringify(s));
-  }, { bloom: false, grain: false, vignette: false, tipsSeen: true, seatPicked: true, ...settings });
+  }, { bloom: false, grain: false, vignette: false, tipsSeen: true, ...settings });
   await page.goto('./');
   await waitForFrames(page);
+}
+
+/** Opens the app settled in, parked on the setup screen. */
+export async function openParked(page: Page, settings: Record<string, unknown> = {}): Promise<void> {
+  await openSeat(page, settings);
+  await page.evaluate(() => window.__drivey.startScreen.settle(true));
 }
 
 /** Resolves once the render loop has really advanced. */

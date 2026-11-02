@@ -41,6 +41,38 @@ export function createNav() {
       g.font = '600 15px Inter, sans-serif';
       g.fillText(routeName, 10, 22);
       texture.needsUpdate = true;
+    },
+
+    /** While the driver settles in: the unit boots and plans the route, a bar sweeping under a turning dial. */
+    drawLoading(t: number, routeName: string): void {
+      g.fillStyle = '#0b0e16';
+      g.fillRect(0, 0, 200, 300);
+      g.fillStyle = 'rgba(255,255,255,.75)';
+      g.font = '600 15px Inter, sans-serif';
+      g.textAlign = 'left';
+      g.fillText(routeName, 10, 22);
+      // A ring of ticks, the brightest one going round.
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2, lit = (i - Math.floor(t * 12) + 12) % 12;
+        g.strokeStyle = `rgba(255,154,60,${0.15 + 0.85 * (1 - lit / 12) ** 2})`;
+        g.lineWidth = 6;
+        g.lineCap = 'round';
+        g.beginPath();
+        g.moveTo(100 + Math.cos(a) * 26, 130 + Math.sin(a) * 26);
+        g.lineTo(100 + Math.cos(a) * 40, 130 + Math.sin(a) * 40);
+        g.stroke();
+      }
+      g.fillStyle = 'rgba(255,255,255,.6)';
+      g.font = '500 13px Inter, sans-serif';
+      g.textAlign = 'center';
+      g.fillText('Planning route' + '.'.repeat(Math.floor(t * 2) % 4), 100, 205);
+      g.fillStyle = 'rgba(120,130,150,.3)';
+      g.fillRect(30, 225, 140, 6);
+      const sweep = (t * 0.6) % 1.3;
+      g.fillStyle = '#ff9a3c';
+      g.fillRect(30 + Math.max(0, sweep - 0.3) * 140, 225, Math.max(0, Math.min(sweep, 1) - Math.max(0, sweep - 0.3)) * 140, 6);
+      g.textAlign = 'left';
+      texture.needsUpdate = true;
     }
   };
 }

@@ -10,20 +10,15 @@ const STATUS: Record<EngineState, string> = {
   running: 'Engine running'
 };
 
-export interface SeatStep {
-  /** Whether the seat still has to be picked, which the first visit asks before anything else. */
-  needed: boolean;
-  /** Runs when the driver settles in, ending the step. */
-  done(): void;
-}
-
 export interface StartScreen {
+  /** Settles into the seat and moves on to setting up the drive; instantly skips the glass clearing. */
+  settle(instantly?: boolean): void;
   /** Goes straight to driving, for the browser tests. */
   skip(): void;
 }
 
-/** Opens parked: set up the drive first, then start the engine with the key. */
-export function createStartScreen(engine: CarEngine, seat: SeatStep): StartScreen {
+/** Opens parked: settle into the seat, set up the drive, then start the engine with the key. `settled` runs as the seat step ends. */
+export function createStartScreen(engine: CarEngine, settled: (instantly: boolean) => void): StartScreen {
   const screen = $('#start'), key = $('#ignition'), status = $('#ignitionStatus');
   const keyBody = document.querySelector<SVGElement>('#keyBody'), keyTag = document.querySelector<SVGElement>('#keyTag');
   if (!keyBody || !keyTag) throw new Error('Missing key artwork');
@@ -31,11 +26,12 @@ export function createStartScreen(engine: CarEngine, seat: SeatStep): StartScree
   const showStep = (step: 'seat' | 'setup' | 'key'): void => {
     screen.dataset.step = step;
   };
-  if (seat.needed) showStep('seat');
-  $('#btnSeated').addEventListener('click', () => {
-    seat.done();
+  const settle = (instantly = false): void => {
+    if (screen.dataset.step !== 'seat') return;
+    settled(instantly);
     showStep('setup');
-  });
+  };
+  $('#btnSeated').addEventListener('click', () => settle());
   $('#btnGetIn').addEventListener('click', () => {
     showStep('key');
     key.focus({ preventScroll: true });
@@ -52,5 +48,11 @@ export function createStartScreen(engine: CarEngine, seat: SeatStep): StartScree
   });
 
   createIgnition(key, keyBody, keyTag, engine);
-  return { skip: () => engine.set('running') };
+  return {
+    settle,
+    skip: () => {
+      settle(true);
+      engine.set('running');
+    }
+  };
 }

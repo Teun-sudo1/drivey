@@ -11,6 +11,9 @@ import { CarRadio, type RadioState } from './radio';
 
 const GAUGE_INTERVAL = 0.1;
 const NAV_INTERVAL = 0.25;
+const LOADING_INTERVAL = 1 / 30;
+/** Which of the screens is the nav unit's. */
+const NAV_SCREEN = 2;
 const SWEEP_SECONDS = 1.2;
 /** Far enough in that the display stays fully on screen at a 16:10 laptop's aspect ratio. */
 const SCREEN_POWER_RATE = 6;
@@ -48,6 +51,8 @@ export class Cockpit {
   /** The roof light, on while the driver settles in; short range, so it stays off the road. */
   readonly cabinLight = new THREE.PointLight(0xffd6a0, 0, 1.5, 1.5);
   private cabinLevel = 0;
+  /** 1 while the nav unit shows its loading screen, which it does with the engine off. */
+  private navLoading = false;
   readonly roof = new THREE.Group();
   readonly wheel = new THREE.Group();
   /** The long 80s lever, rising between the seats into the lower corner of the view. */
@@ -67,6 +72,7 @@ export class Cockpit {
   private side = 1;
   private engine: EngineState = 'off';
   private power = 0;
+  private navPower = 0;
   private sweepLeft = 0;
   private readonly gauges = createGauges();
   private readonly lcd = createLcd();
@@ -175,6 +181,11 @@ export class Cockpit {
     this.gaugeScreen.scale.set(scale * this.side, scale, 1);
   }
 
+  setNavLoading(on: boolean): void {
+    this.navLoading = on;
+    this.navTimer = NAV_INTERVAL;
+  }
+
   setCabinLight(on: boolean): void {
     this.cabinLevel = on ? CABIN_LIGHT : 0;
   }
@@ -194,9 +205,11 @@ export class Cockpit {
     this.mirror.update(dt, speed, bend);
     this.cabinLight.intensity = lerp(this.cabinLight.intensity, this.cabinLevel, damp(CABIN_FADE_RATE, dt));
     const power = lerp(this.power, this.engine === 'off' ? 0 : 1, damp(SCREEN_POWER_RATE, dt));
-    if (power !== this.power) {
+    const navPower = lerp(this.navPower, this.navLoading ? 1 : power, damp(SCREEN_POWER_RATE, dt));
+    if (power !== this.power || navPower !== this.navPower) {
       this.power = power;
-      this.screens.forEach((s, i) => (s.material as THREE.MeshBasicMaterial).color.setScalar(power * SCREEN_LEVELS[i]));
+      this.navPower = navPower;
+      this.screens.forEach((s, i) => (s.material as THREE.MeshBasicMaterial).color.setScalar((i === NAV_SCREEN ? navPower : power) * SCREEN_LEVELS[i]));
     }
     // Beside the radio on a phone, the display takes its squarer shape.
     const lcdMaterial = this.lcdScreen.material as THREE.MeshBasicMaterial, lcdMap = this.radio.compact ? this.lcd.textures.compact : this.lcd.textures.wide;
@@ -216,7 +229,13 @@ export class Cockpit {
       this.gauges.draw(Math.max(kmh, sweep * 180), this.rpm(kmh, sweep, clock));
     }
     this.navTimer += dt;
-    if (this.navTimer >= NAV_INTERVAL) {
+    if (this.navLoading) {
+      // Redrawn often enough for the dial to turn smoothly.
+      if (this.navTimer >= LOADING_INTERVAL) {
+        this.navTimer = 0;
+        this.nav.drawLoading(clock, this.routeName);
+      }
+    } else if (this.navTimer >= NAV_INTERVAL) {
       this.navOffset += speed * this.navTimer * 0.6;
       this.navTimer = 0;
       this.nav.draw(this.navOffset, bend, this.routeName);

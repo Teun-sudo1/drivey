@@ -65,6 +65,12 @@ function saveFile(name: string, text: string): void {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+/** Safari's audio session as playback, which also plays through the ring/silent switch, as music apps do. */
+function playInBackground(): void {
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+  if (session) session.type = 'playback';
+}
+
 /** Caches the app so it opens without a network. Built files only: the dev server changes too often. */
 function enableOffline(): void {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
@@ -76,5 +82,5 @@ function enableOffline(): void {
 
 export function createWebPlatform(): Platform {
   enableOffline();
-  return { storage, keepAwake: createWakeLock(), sessions: createSessionDb(), saveFile };
+  return { storage, keepAwake: createWakeLock(), sessions: createSessionDb(), saveFile, playInBackground };
 }

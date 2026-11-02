@@ -44,6 +44,32 @@ test.describe('quality', () => {
     expect(await measure()).toMatchObject({ pixelRatio: 1, particles: 500, bloomed: false, reflected: false });
   });
 
+  test('on Auto, a device that can\'t keep up steps down a level, and a chosen level stays', async ({ page }) => {
+    test.setTimeout(60_000);
+    await openApp(page);
+    const name = () => page.evaluate(() => window.__drivey.quality().name);
+    const start = await name();
+    // A slow device, faked: every frame takes about 50 ms to draw.
+    await page.evaluate(() => {
+      const { renderer } = window.__drivey.stage, render = renderer.render.bind(renderer);
+      renderer.render = (...a: Parameters<typeof render>) => {
+        const until = performance.now() + 50;
+        while (performance.now() < until);
+        return render(...a);
+      };
+    });
+    await expect.poll(name, { timeout: 20_000 }).toBe(start === 'High' ? 'Medium' : 'Low');
+    await expect(page.locator('#toast')).toContainText('keep the drive smooth');
+
+    // Picked by hand, the level is the visitor's call: it stays, with nothing said about it.
+    await page.evaluate(() => (document.querySelector('#toast')!.textContent = ''));
+    await update(page, { quality: 'high' });
+    // Long enough for Auto to have stepped down again: frame times are capped, so slow frames count for less.
+    await page.waitForTimeout(18_000);
+    expect(await name()).toBe('High');
+    await expect(page.locator('#toast')).toHaveText('');
+  });
+
   test('the setting is in Scene › Graphics and is remembered', async ({ page }) => {
     await openApp(page);
     await openSceneTab(page);

@@ -7,6 +7,11 @@ export interface Platform {
   sessions: SessionStore;
   /** Hands a file to the user: a download here, the share sheet in a native shell. */
   saveFile(name: string, text: string): void;
+  /**
+   * Called as sound first starts: asks for it to carry on with the screen locked, like a music
+   * player. Safari's audio session here; the Audio background mode in a native shell.
+   */
+  playInBackground(): void;
 }
 
 /** Async because native key-value stores (Capacitor Preferences) are. */

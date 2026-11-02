@@ -62,11 +62,24 @@ test.describe('layout', () => {
   test('in landscape the buttons on the right line up in one column', async ({ page }) => {
     test.skip(isPortrait(page), 'upright, the controls sit in a row at the bottom');
     await openApp(page);
-    const centres = await page.evaluate(() => ['#btnFull', '#btnReset', '#btnPlay', '#btnSkip', '#btnPanel'].map(sel => {
+    // The fullscreen button is left out where it's hidden.
+    const centres = await page.evaluate(() => ['#btnPlay', '#btnFull', '#btnReset', '#btnSkip', '#btnPanel'].flatMap(sel => {
       const r = document.querySelector(sel)!.getBoundingClientRect();
-      return r.left + r.width / 2;
+      return r.width ? [r.left + r.width / 2] : [];
     }));
-    for (const x of centres) expect(Math.abs(x - centres[2])).toBeLessThan(1);
+    expect(centres.length).toBeGreaterThanOrEqual(4);
+    for (const x of centres) expect(Math.abs(x - centres[0])).toBeLessThan(1);
+  });
+
+  test('the fullscreen button only shows where fullscreen works', async ({ page }) => {
+    await openApp(page);
+    await expect(page.locator('#btnFull')).toBeVisible();
+    // iPhone Safari, and a native shell's web view, have none.
+    await page.addInitScript(() => Object.defineProperty(Document.prototype, 'fullscreenEnabled', { get: () => false }));
+    await page.reload();
+    await page.evaluate(() => window.__drivey.startScreen.skip());
+    await expect(page.locator('#btnPanel')).toBeVisible();
+    await expect(page.locator('#btnFull')).toBeHidden();
   });
 
   test('graphics toggles reach the page', async ({ page }) => {
