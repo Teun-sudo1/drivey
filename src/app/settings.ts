@@ -47,7 +47,13 @@ export interface Settings {
   followSession: boolean;
   /** Whether the first-drive tips have been dismissed. */
   tipsSeen: boolean;
+  /** Where the driver sits; auto sits close on a phone and back from the wheel on bigger screens. */
+  seat: SeatId;
+  /** Whether the first visit's choice of seat has been made. */
+  seatPicked: boolean;
 }
+
+export type SeatId = 'auto' | 'close' | 'back';
 
 export type DurationKey = 'focus' | 'short' | 'long' | 'every';
 export type ToggleKey = 'bloom' | 'vignette' | 'grain' | 'reduced' | 'auto' | 'breakSlow' | 'follow' | 'muted' | 'followSession';
@@ -87,7 +93,9 @@ function defaults(): Settings {
     task: '',
     quality: 'auto',
     followSession: true,
-    tipsSeen: false
+    tipsSeen: false,
+    seat: 'auto',
+    seatPicked: false
   };
 }
 
@@ -125,8 +133,9 @@ function sanitize(stored: unknown): Settings {
     }).slice(0, MAX_PRESETS);
   }
   if (raw.quality === 'auto' || raw.quality === 'low' || raw.quality === 'medium' || raw.quality === 'high') s.quality = raw.quality;
+  if (raw.seat === 'auto' || raw.seat === 'close' || raw.seat === 'back') s.seat = raw.seat;
   if (typeof raw.task === 'string') s.task = raw.task.slice(0, MAX_TASK);
-  for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow', 'follow', 'muted', 'musicOn', 'tipsSeen', 'followSession'] as const) {
+  for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow', 'follow', 'muted', 'musicOn', 'tipsSeen', 'seatPicked', 'followSession'] as const) {
     const v = raw[k];
     if (typeof v === 'boolean') s[k] = v;
   }

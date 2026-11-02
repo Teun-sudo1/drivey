@@ -10,20 +10,32 @@ const STATUS: Record<EngineState, string> = {
   running: 'Engine running'
 };
 
+export interface SeatStep {
+  /** Whether the seat still has to be picked, which the first visit asks before anything else. */
+  needed: boolean;
+  /** Runs when the driver settles in, ending the step. */
+  done(): void;
+}
+
 export interface StartScreen {
   /** Goes straight to driving, for the browser tests. */
   skip(): void;
 }
 
 /** Opens parked: set up the drive first, then start the engine with the key. */
-export function createStartScreen(engine: CarEngine): StartScreen {
+export function createStartScreen(engine: CarEngine, seat: SeatStep): StartScreen {
   const screen = $('#start'), key = $('#ignition'), status = $('#ignitionStatus');
   const keyBody = document.querySelector<SVGElement>('#keyBody'), keyTag = document.querySelector<SVGElement>('#keyTag');
   if (!keyBody || !keyTag) throw new Error('Missing key artwork');
 
-  const showStep = (step: 'setup' | 'key'): void => {
+  const showStep = (step: 'seat' | 'setup' | 'key'): void => {
     screen.dataset.step = step;
   };
+  if (seat.needed) showStep('seat');
+  $('#btnSeated').addEventListener('click', () => {
+    seat.done();
+    showStep('setup');
+  });
   $('#btnGetIn').addEventListener('click', () => {
     showStep('key');
     key.focus({ preventScroll: true });

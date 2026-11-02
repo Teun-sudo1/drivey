@@ -84,10 +84,11 @@ export class Drive {
     camera.position.y = Math.sin(t * 61) * crank + eyeHeight + Math.sin(t * 9.3) * 0.0025 * sway * (this.speed / 22) + Math.sin(t * 1.7) * 0.004 * sway;
     camera.position.x = this.laneOffset + Math.sin(t * 0.43) * 0.02 * sway;
     camera.rotation.set(
-      framing.pitch + Math.sin(t * 0.8) * 0.002 * sway,
+      framing.pitch - framing.lookDown + Math.sin(t * 0.8) * 0.002 * sway,
       -this.bend * 20 + Math.sin(t * 0.31) * 0.006 * sway,
       Math.sin(t * 0.5) * 0.002 * sway + Math.sin(t * 47) * crank
     );
+    this.cockpit.seat(framing.seatBack, framing.lookDown);
     this.cockpit.roof.position.y = framing.roofY;
     this.cockpit.mirror.place(framing);
     this.cockpit.radio.place(framing);

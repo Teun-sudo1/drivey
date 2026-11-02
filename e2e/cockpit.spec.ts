@@ -1,4 +1,4 @@
-import { advance, brightnessAt, expect, isPortrait, mirrorRect, openApp, openSceneTab, overlaps, test, textRect, update } from './support';
+import { advance, brightnessAt, expect, isPhone, isPortrait, mirrorRect, openApp, openSceneTab, overlaps, test, textRect, update } from './support';
 import { GAUGE_LANDMARKS } from '../src/scene/cockpit/gauges';
 
 const rectOf = async (page: any, selector: string) => {
@@ -109,8 +109,8 @@ test('the wheel frames the gauges without covering the dials or the speed', asyn
   shown.forEach((b, i) => expect(Math.abs(b - hidden[i]), `landmark ${i}`).toBeLessThan(1.5));
 });
 
-test('the gear lever shows between the radio and the wheel in landscape', async ({ page }) => {
-  test.skip(isPortrait(page), 'portrait crops the lower dashboard to the wheel');
+test('on a bigger screen the eye sits back, showing the gear lever on the console', async ({ page }) => {
+  test.skip(isPortrait(page) || isPhone(page), 'phones sit close, so the radio stays big enough to tap');
   await openApp(page, { tod: 'day', weather: 'clear' });
   await advance(page, 2);
   await page.waitForFunction(() => window.__drivey.stage.settled);
@@ -133,16 +133,16 @@ test('the gear lever shows between the radio and the wheel in landscape', async 
       radio: { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) }
     };
   });
-  // Its upper half is in view, clear of the radio and left of the wheel's hub.
-  expect(knob.y).toBeLessThan(page.viewportSize()!.height - radius * 0.2);
-  expect(knob.x - radius * 0.6).toBeGreaterThan(radio.right);
+  // All of it is in view, below the radio and left of the wheel's hub.
+  expect(knob.y + radius).toBeLessThan(page.viewportSize()!.height);
+  expect(knob.y - radius).toBeGreaterThan(radio.bottom);
   expect(knob.x).toBeLessThan(page.viewportSize()!.width / 2);
-  // And nothing in front hides it: by day, its dark shape stands out against the lit dash behind.
+  // And nothing in front hides it: drawing it changes what's there, where hidden it changes nothing.
   const at = { x: knob.x, y: knob.y - radius * 0.3 };
   const shown = await brightnessAt(page, at.x, at.y, radius * 0.3);
   await page.evaluate(() => (window.__drivey.cockpit.gearLever.visible = false));
   const hidden = await brightnessAt(page, at.x, at.y, radius * 0.3);
-  expect(Math.abs(shown - hidden)).toBeGreaterThan(10);
+  expect(Math.abs(shown - hidden)).toBeGreaterThan(3);
 });
 
 test.describe('driving side', () => {

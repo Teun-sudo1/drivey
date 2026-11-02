@@ -28,6 +28,8 @@ export interface Windshield {
   draw(): void;
   /** The streetlight colour drops pick up, which differs by route. */
   setLampTint(tint: LampTint): void;
+  /** Steams the glass up, or clears it as the demister would; instantly skips the easing. */
+  setMisted(misted: boolean, instantly?: boolean): void;
 }
 
 interface Drop {
@@ -54,6 +56,8 @@ const WIPER_BLADE_WIDTH = 0.0067;
 const DRY_RATE = 0.15;
 const FLAKE_MELT_RATE = 0.06;
 const VEIL_RATE = 1.1;
+/** How quickly the glass clears once a seat is picked. */
+const DEMIST_RATE = 1.6;
 const GLASS_LOWER_EDGE = [-1.2, -0.35, 0.6];
 const RUNNING_DROP_RADIUS = 3.4;
 const MAX_TRAIL = 110;
@@ -113,6 +117,9 @@ class CanvasWindshield implements Windshield {
   private drops: Drop[] = [];
   private dropBudget = 0;
   private veil = 0;
+  /** Steamed-up glass, which hides the view until the driver has picked a seat. */
+  private mist = 0;
+  private mistTarget = 0;
   private wiperPhase = 0;
   private wiperWait = 0;
   private wiperAngle = WIPER_PARKED;
@@ -152,6 +159,12 @@ class CanvasWindshield implements Windshield {
     this.age(dt, speed, weather);
     this.moveWipers(dt, weather, wipersOn);
     this.veil = lerp(this.veil, weather.veil, damp(VEIL_RATE, dt));
+    this.mist = Math.abs(this.mist - this.mistTarget) < 0.002 ? this.mistTarget : lerp(this.mist, this.mistTarget, damp(DEMIST_RATE, dt));
+  }
+
+  setMisted(misted: boolean, instantly = false): void {
+    this.mistTarget = misted ? 1 : 0;
+    if (instantly) this.mist = this.mistTarget;
   }
 
   private syncSize(): void {
@@ -280,7 +293,7 @@ class CanvasWindshield implements Windshield {
   }
 
   draw(): void {
-    const empty = this.drops.length === 0 && this.veil <= 0.001 && this.wiperAngle === WIPER_PARKED && this.wiperPeriod === 0;
+    const empty = this.drops.length === 0 && this.veil <= 0.001 && this.mist === 0 && this.wiperAngle === WIPER_PARKED && this.wiperPeriod === 0;
     if (empty && this.blank) return;
     this.blank = empty;
     const g = this.ctx;
@@ -291,6 +304,7 @@ class CanvasWindshield implements Windshield {
       g.fillStyle = `rgba(190,200,212,${this.veil})`;
       g.fillRect(0, 0, this.width, this.bottom);
     }
+    if (this.mist > 0) this.drawMist();
     this.drawTrails();
     for (const d of this.drops) {
       g.globalAlpha = d.alpha;
@@ -349,6 +363,15 @@ class CanvasWindshield implements Windshield {
       g.stroke();
     }
     g.globalAlpha = 1;
+  }
+
+  /** Condensation: thickest up top, thinning towards the vents at the bottom of the glass. */
+  private drawMist(): void {
+    const g = this.ctx, fade = g.createLinearGradient(0, this.top, 0, this.bottom);
+    fade.addColorStop(0, `rgba(122,130,142,${0.97 * this.mist})`);
+    fade.addColorStop(1, `rgba(96,104,116,${0.9 * this.mist})`);
+    g.fillStyle = fade;
+    g.fillRect(0, this.top, this.width, this.bottom - this.top);
   }
 
   /** The film of water a blade leaves behind as it sweeps. */

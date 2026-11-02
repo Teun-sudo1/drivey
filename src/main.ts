@@ -13,7 +13,7 @@ import { CarEngine } from './app/carEngine';
 import { startLoop } from './app/loop';
 import { SCENE_PRESETS, matchingPreset } from './app/scenePresets';
 import { QUALITY, resolveQuality, type QualityId } from './app/quality';
-import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type ToggleKey } from './app/settings';
+import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type SeatId, type ToggleKey } from './app/settings';
 import { MusicPlayer } from './music/player';
 import { getPlatform } from './platform';
 import { ROUTES, type RouteId } from './routes';
@@ -75,9 +75,20 @@ engine.onChange(state => cockpit.setEngine(state));
 engine.onChange(state => {
   if (state === 'running') showTipsOnce(settings);
 });
-const startScreen = createStartScreen(engine);
 const environment = new Environment(stage, lights, postfx, cockpit, backdrop, particles);
 const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera, cockpit.roof, cockpit.glassOccluders, route.lampTint);
+const applySeat = (): void => stage.setSeat(settings.value.seat);
+settings.onChange(applySeat);
+applySeat();
+// The first visit picks a seat behind steamed-up glass, so the scenery is still a surprise.
+windshield.setMisted(!settings.value.seatPicked, true);
+const startScreen = createStartScreen(engine, {
+  needed: !settings.value.seatPicked,
+  done: () => {
+    settings.update({ seat: stage.seatFor(), seatPicked: true });
+    windshield.setMisted(false);
+  }
+});
 
 /* Sound */
 const audio = new AudioEngine();
@@ -195,6 +206,7 @@ const sceneControls = [
   ),
   ...[$('#segRoute'), $('#startRoute')].map(el => mountSegmented<RouteId>(el, options(ROUTES), () => settings.value.route, route => settings.update({ route }))),
   ...[$('#segSide'), $('#startSide')].map(el => mountSegmented<DriveSide>(el, [['left', 'Left'], ['right', 'Right']], () => settings.value.driveSide, driveSide => settings.update({ driveSide }))),
+  ...[$('#segSeat'), $('#startSeatChoice')].map((el, i) => mountSegmented<SeatId>(el, [...(i ? [] : [['auto', 'Auto'] as const]), ['close', 'Close to the wheel'], ['back', 'Sit back']], () => (i ? stage.seatFor() : settings.value.seat), seat => settings.update({ seat }))),
   mountSegmented<QualityId>($('#segQuality'), [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], () => settings.value.quality, q => settings.update({ quality: q })),
   ...[$('#segTod'), $('#startTod')].map(el => mountSegmented<TimeOfDayId>(el, options(TIMES_OF_DAY), () => settings.value.tod, tod => settings.update({ tod }))),
   ...[$('#segWeather'), $('#startWeather')].map(el => mountSegmented<WeatherId>(el, options(WEATHERS), () => settings.value.weather, weather => settings.update({ weather })))

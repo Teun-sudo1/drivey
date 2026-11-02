@@ -98,7 +98,7 @@ Settings › Scene › Graphics has Auto, Low, Medium and High. They scale the r
 | --- | --- |
 | `src/app` | Frame loop, persisted settings, and the car's ignition state |
 | `src/scene` | Renderer, road chunks, road surface, drive motion, post-processing |
-| `src/scene/cockpit` | Interior: gauges, nav screen, mirror, and the radio with the timer display |
+| `src/scene/cockpit` | Interior: gauges, nav screen, mirror, the radio with the timer display, and the cabin (doors, console, gear lever, glovebox). On a laptop or tablet the eye sits back from the wheel to show the cabin; a phone sits close so the radio stays easy to tap |
 | `src/routes` | One file per route, plus shared road parts |
 | `src/traffic` | Cars and trucks, their lanes, lane changes and spacing |
 | `src/weather` | Time of day and weather, rain and snow, the windshield |

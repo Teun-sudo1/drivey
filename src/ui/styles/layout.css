@@ -90,7 +90,7 @@ body.parked #hud { visibility: hidden; }
   transition: opacity .9s;
 }
 #start.gone { opacity: 0; pointer-events: none; }
-#start[data-step="setup"] #startKey, #start[data-step="key"] #startSetup { display: none; }
+#start:not([data-step="seat"]) #startSeat, #start:not([data-step="setup"]) #startSetup, #start:not([data-step="key"]) #startKey { display: none; }
 #start.cranking #ignition svg { animation: crank .09s linear infinite; }
 body.reduced #start.cranking #ignition svg { animation: none; }
 @keyframes crank {

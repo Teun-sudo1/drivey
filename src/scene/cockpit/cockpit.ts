@@ -20,7 +20,7 @@ const DIAL_RATE = 5;
 const SCREEN_LEVELS = [1, 1, 0.73, 1];
 const PILLAR_WIDTH = 0.11;
 /** Where the lever leaves the console, how far it leans back, and its reach up into the gap between radio and wheel. */
-const GEAR_LEVER = { x: -0.22, y: -0.78, z: -0.78, lean: 0.25, length: 0.5, knob: 0.036 };
+const GEAR_LEVER = { x: -0.36, y: -0.64, z: -0.6, lean: 0.25, length: 0.24, knob: 0.032 };
 
 /** Part of the interior that sits in front of the windshield, as a polygon local to `object`. */
 export interface GlassOccluder {
@@ -97,6 +97,7 @@ export class Cockpit {
     mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.05, 20), intA, 0, -0.02, 0, 1, 1, 1, this.wheel).rotation.x = Math.PI / 2;
 
     this.gearLever = this.addGearLever(root, intA, intB);
+    this.addCabin(root, intA, intB);
 
     root.add(this.roof);
     mesh(BOX, intB, -0.35, 0.52, -0.82, 2.8, 0.07, 0.55, this.roof);
@@ -125,6 +126,12 @@ export class Cockpit {
     this.side = side;
     this.root.scale.x = side;
     for (const s of this.screens) s.scale.x = side;
+  }
+
+  /** Sits the eye back from the wheel and tilts it down into the car; the interior itself doesn't move in the car. */
+  seat(back: number, lookDown: number): void {
+    this.root.rotation.x = lookDown;
+    this.root.position.set(0, Math.sin(lookDown) * back, -Math.cos(lookDown) * back);
   }
 
   /** Sizes the gauges for the framing, keeping them mirrored with the interior. */
@@ -199,6 +206,24 @@ export class Cockpit {
     if (this.engine === 'running') return 1.1 + kmh / 45 + Math.sin(clock * 3) * 0.03;
     if (this.engine === 'cranking') return 0.5 + Math.abs(Math.sin(clock * 22)) * 0.5;
     return sweep * 8;
+  }
+
+  /** Doors, floor, the console between the seats, and the passenger's side of the dash. */
+  private addCabin(root: THREE.Group, panel: THREE.Material, trim: THREE.Material): void {
+    for (const x of [-1.3, 0.72]) {
+      mesh(BOX, panel, x, -0.76, -0.4, 0.08, 0.62, 2.2, root);
+      mesh(BOX, trim, x + Math.sign(x + 0.35) * -0.02, -0.44, -0.4, 0.12, 0.04, 2.2, root);
+    }
+    mesh(BOX, trim, -0.29, -1.06, -0.4, 2.05, 0.04, 2.2, root);
+    mesh(BOX, trim, -0.36, -0.82, -0.3, 0.22, 0.38, 1.1, root);
+    mesh(BOX, panel, -0.36, -0.62, 0.02, 0.2, 0.05, 0.36, root);
+    // The passenger's side of the dash: a glovebox with its catch, and an air vent at the end.
+    const lid = new THREE.MeshStandardMaterial({ color: 0x1e1f23, roughness: 0.7 });
+    const chrome = new THREE.MeshStandardMaterial({ color: 0x8a8b90, roughness: 0.35, metalness: 0.8 });
+    mesh(BOX, lid, -0.86, -0.6, -0.944, 0.42, 0.15, 0.012, root);
+    mesh(BOX, chrome, -0.73, -0.56, -0.936, 0.07, 0.014, 0.01, root);
+    mesh(BOX, trim, -1.16, -0.53, -0.944, 0.16, 0.07, 0.012, root);
+    for (let i = 0; i < 3; i++) mesh(BOX, panel, -1.16, -0.552 + i * 0.022, -0.936, 0.15, 0.006, 0.006, root);
   }
 
   /** Rod, rubber boot and knob, leaning back towards the driver from the console. */

@@ -27,6 +27,18 @@ test.describe('sound', () => {
     expect(await type()).toBe('playback');
   });
 
+  test('closing the page fades the sound out instead of cutting it with a click', async ({ page }) => {
+    await openParked(page);
+    await page.click('#startTod button:has-text("Dusk")');
+    const master = () => page.evaluate(() => window.__drivey.audio.graph.master.gain.value);
+    await expect.poll(master).toBeGreaterThan(0.5);
+    await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false })));
+    await expect.poll(master, { timeout: 2000 }).toBeLessThan(0.01);
+    // Restored from the back-forward cache, it plays again.
+    await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+    await expect.poll(master).toBeGreaterThan(0.5);
+  });
+
   test('the starter turns over while cranking, then the engine hums', async ({ page }) => {
     await openParked(page, { weather: 'clear' });
     await page.click('#btnGetIn');

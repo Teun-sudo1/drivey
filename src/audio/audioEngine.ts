@@ -6,6 +6,8 @@ export type Mix = Record<Channel, number>;
 
 /** How quickly a level change is eased in, in seconds. */
 const LEVEL_EASE = 0.4;
+/** Time constant of the fade as the page closes: a few milliseconds, which is all a closing page gets. */
+const CLOSE_FADE = 0.004;
 
 export interface AudioGraph {
   readonly ctx: AudioContext;
@@ -59,6 +61,12 @@ export class AudioEngine {
     })) as Record<Channel, GainNode>;
     const noise = { white: noiseBuffer(ctx, 'white'), brown: noiseBuffer(ctx, 'brown'), crackle: noiseBuffer(ctx, 'crackle') };
     this.graph = { ctx, master, channels, noise };
+    // Closing the tab cuts the sound mid-wave, which clicks; a fade as it starts closing ends it at silence.
+    addEventListener('pagehide', () => master.gain.setTargetAtTime(0, ctx.currentTime, CLOSE_FADE));
+    // Coming back from the browser's back-forward cache.
+    addEventListener('pageshow', e => {
+      if (e.persisted) this.setMuted(this.muted);
+    });
     for (const listener of this.readyListeners) listener(this.graph);
   }
 

@@ -1,4 +1,4 @@
-import { brightnessAt, expect, isPortrait, openApp, test } from './support';
+import { brightnessAt, expect, isPhone, isPortrait, openApp, test } from './support';
 
 test.describe('layout', () => {
   test('the scene renders and the first frame runs forwards', async ({ page }) => {
@@ -45,7 +45,9 @@ test.describe('layout', () => {
     await openApp(page);
     const size = page.viewportSize()!;
     const fov = () => page.evaluate(() => window.__drivey.stage.camera.fov);
-    const startFov = isPortrait(page) ? 70 : 55, otherFov = isPortrait(page) ? 55 : 70;
+    // Laptops sit back from the wheel; a phone on its side sits close, which narrows the view.
+    const landscapeFov = isPhone(page) ? 55 : 62;
+    const startFov = isPortrait(page) ? 70 : landscapeFov, otherFov = isPortrait(page) ? landscapeFov : 70;
     expect(await fov()).toBeCloseTo(startFov, 1);
 
     await page.setViewportSize({ width: size.height, height: size.width });
