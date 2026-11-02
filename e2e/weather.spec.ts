@@ -94,6 +94,23 @@ test.describe('windshield', () => {
     expect(await glassPixels(page)).toBe(0);
   });
 
+  test('no water film stays behind if the weather clears just as a wipe ends', async ({ page }) => {
+    await openApp(page, { weather: 'heavy' });
+    // Stops on the exact frame a stroke finishes, which is where the film once got stuck on the glass.
+    await page.evaluate(() => {
+      const { windshield, simulate, settings } = window.__drivey;
+      let wasMoving = false;
+      for (let i = 0; i < 400; i++) {
+        simulate(0.05);
+        if (wasMoving && windshield.wiperPhase === 0) break;
+        wasMoving = windshield.wiperPhase > 0;
+      }
+      settings.update({ weather: 'clear' });
+    });
+    await advance(page, 10);
+    expect(await glassPixels(page)).toBe(0);
+  });
+
   test('nothing on the glass is drawn over the mirror or below the dashboard', async ({ page }) => {
     await openApp(page, { weather: 'heavy' });
     await advance(page, 3);

@@ -220,7 +220,11 @@ class CanvasWindshield implements Windshield {
     // When the weather clears, a blade mid-sweep finishes its stroke instead of snapping home.
     if (wipersOn && w.wipe > 0) this.wiperPeriod = w.wipe;
     else if (this.wiperPhase === 0) this.wiperPeriod = 0;
-    if (this.wiperPeriod === 0) return;
+    if (this.wiperPeriod === 0) {
+      // Otherwise the film from the blade's last movement would keep being drawn on parked wipers.
+      this.wiperMotion = 0;
+      return;
+    }
 
     if (this.wiperWait > 0) {
       this.wiperWait -= dt;

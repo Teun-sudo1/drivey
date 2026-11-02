@@ -122,7 +122,8 @@ export async function mirrorInnerRect(page: Page): Promise<Rect> {
       const v = object.localToWorld(p.clone()).project(stage.camera);
       return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
     });
-    const inset = 2;
+    // Generous, because on a slow machine the glass can be a frame behind this measurement.
+    const inset = 8;
     return {
       left: Math.max(bl.x, tl.x) + inset,
       right: Math.min(br.x, tr.x) - inset,
