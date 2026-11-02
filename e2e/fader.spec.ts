@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { advance, expect, glassPixels, isPhone, openApp, openParked, test } from './support';
+import { advance, expect, isPhone, openApp, openParked, test } from './support';
 
 /** The fader's slot on screen, from 0 to 10, and its housing's box. */
 async function fader(page: Page) {
@@ -81,13 +81,30 @@ test.describe('dashboard volume fader', () => {
   });
 
   test('rain on the glass never covers it', async ({ page }) => {
-    // Reduced motion stills the camera's sway, so the fader can't move between measuring and checking.
-    await openApp(page, { weather: 'heavy', reduced: true });
+    await openApp(page, { weather: 'heavy' });
     await advance(page, 4);
-    const { box } = await fader(page);
-    expect(await glassPixels(page)).toBeGreaterThan(50);
-    // Inset past the soft, anti-aliased edge of the clip.
-    expect(await glassPixels(page, { left: box.left + 8, right: box.right - 8, top: box.top + 8, bottom: box.bottom - 8 })).toBe(0);
+    await page.waitForFunction(() => window.__drivey.stage.settled);
+    // Measured, drawn and read in one go, so no frame can move anything in between.
+    const { inside, total } = await page.evaluate(() => {
+      const { cockpit, stage, windshield } = window.__drivey;
+      stage.camera.updateMatrixWorld(true);
+      windshield.draw();
+      const canvas = document.querySelector<HTMLCanvasElement>('#glass')!, scale = canvas.width / canvas.clientWidth;
+      const corners = cockpit.fader.outline.map((p: any) => {
+        const v = cockpit.fader.group.localToWorld(p.clone()).project(stage.camera);
+        return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
+      });
+      // Seen at an angle the housing is a slanted quad, so take the largest box inside it, not around it,
+      // inset past the clip's soft, anti-aliased edge.
+      const [bl, br, tr, tl] = corners;
+      const left = Math.max(bl.x, tl.x) + 4, right = Math.min(br.x, tr.x) - 4, top = Math.max(tl.y, tr.y) + 4, bottom = Math.min(bl.y, br.y) - 4;
+      const x = left * scale, y = top * scale, w = (right - left) * scale, h = (bottom - top) * scale;
+      const ctx = canvas.getContext('2d')!;
+      const count = (d: Uint8ClampedArray) => d.reduce((n, v, i) => n + (i % 4 === 3 && v ? 1 : 0), 0);
+      return { inside: count(ctx.getImageData(x, y, w, h).data), total: count(ctx.getImageData(0, 0, canvas.width, canvas.height).data) };
+    });
+    expect(total).toBeGreaterThan(50);
+    expect(inside).toBe(0);
   });
 
   test('its scale stays readable when driving on the right', async ({ page }) => {

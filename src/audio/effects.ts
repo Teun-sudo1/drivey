@@ -1,4 +1,4 @@
-import type { AudioEngine } from './engine';
+import type { AudioEngine } from './audioEngine';
 import { filter, midiToHz } from './nodes';
 
 /** One-off sounds: the wiper blade, the phase chime and the key clicking between positions. */

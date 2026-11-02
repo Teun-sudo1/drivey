@@ -1,4 +1,4 @@
-import { CHANNELS, type Channel } from '../audio/engine';
+import { CHANNELS, type Channel } from '../audio/audioEngine';
 import { MAX_PRESETS, MAX_PRESET_NAME, type SettingsStore } from '../app/settings';
 import type { MusicPlayer } from '../music/player';
 import { STYLES, type StyleId } from '../music/styles';

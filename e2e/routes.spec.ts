@@ -62,6 +62,25 @@ test.describe('routes', () => {
     });
   }
 
+  test('every route stays within its draw-call budget, which phones depend on', async ({ page }) => {
+    await openApp(page, { route: 'city', weather: 'clear' });
+    for (const route of ROUTES) {
+      await update(page, { route: route.id });
+      await advance(page, 3);
+      const calls = await page.evaluate(() => {
+        const { stage } = window.__drivey, info = stage.renderer.info;
+        info.autoReset = false;
+        info.reset();
+        stage.renderer.render(stage.scene, stage.camera);
+        const n = info.render.calls;
+        info.autoReset = true;
+        return n;
+      });
+      // Before merging each chunk's static meshes the highway alone took over 500.
+      expect(calls, route.name).toBeLessThan(420);
+    }
+  });
+
   test('switching route mid-drive keeps the engine running and frees the old road', async ({ page }) => {
     await openApp(page, { route: 'city' });
     await waitForFrames(page);

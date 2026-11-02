@@ -1,8 +1,7 @@
 import { pick, rand } from '../lib/math';
-import type { StyleId } from '../music/styles';
-import { GENERATED_STYLES, type GeneratedStyle } from './generatedStyles';
-import type { AudioGraph } from './engine';
-import { filter, impulse, loop, midiToHz } from './nodes';
+import type { AudioGraph } from '../audio/audioEngine';
+import { filter, impulse, loop, midiToHz } from '../audio/nodes';
+import { STYLES, type MusicStyle, type StyleId } from './styles';
 
 /** Notes are scheduled this far ahead of the audio clock, so a busy frame can't make them late. */
 const LOOKAHEAD = 0.15;
@@ -19,7 +18,7 @@ export class GeneratedMusic {
   private readonly wet: GainNode;
   private readonly dry: GainNode;
   private readonly crackle: GainNode;
-  private style: GeneratedStyle | null = null;
+  private style: MusicStyle | null = null;
   private timer = 0;
   private step = 0;
   private bar = 0;
@@ -55,7 +54,7 @@ export class GeneratedMusic {
   start(id: StyleId, transpose = 0): void {
     this.stop();
     this.transpose = transpose;
-    const style = (this.style = GENERATED_STYLES[id]);
+    const style = (this.style = STYLES[id]);
     this.wet.gain.value = style.wet;
     this.dry.gain.value = 1 - style.wet * 0.4;
     this.crackle.gain.value = style.crackle;
@@ -86,7 +85,7 @@ export class GeneratedMusic {
     }
   }
 
-  private playStep(st: GeneratedStyle, s: number, t: number, spb: number): void {
+  private playStep(st: MusicStyle, s: number, t: number, spb: number): void {
     const bars = st.chordBars ?? 1, chord = st.ch[Math.floor(this.bar / bars) % st.ch.length];
     const hit = (pattern: string): boolean => pattern[s] === 'x';
     const pad = st.voice === 'pad';

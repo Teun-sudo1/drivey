@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export const BOX = new THREE.BoxGeometry(1, 1, 1);
 export const PLANE = new THREE.PlaneGeometry(1, 1);
@@ -18,6 +19,41 @@ export function disposeTree(root: THREE.Object3D): void {
     if (o instanceof THREE.InstancedMesh) o.dispose();
     if (o instanceof THREE.Mesh && !SHARED.has(o.geometry)) o.geometry.dispose();
   });
+}
+
+/**
+ * Merges the plain meshes directly under each group of root that share a
+ * material into one, so a chunk of road or a car costs a handful of draw calls
+ * rather than dozens. Groups stay as they are, so anything shown or hidden as
+ * a group still is; meshes in `keep` (ones that change on their own) are left alone.
+ */
+export function mergeStatic(root: THREE.Object3D, keep: ReadonlySet<THREE.Object3D> = new Set()): void {
+  const groups: THREE.Object3D[] = [];
+  root.traverse(o => {
+    if (!(o instanceof THREE.Mesh)) groups.push(o);
+  });
+  for (const group of groups) {
+    const byMaterial = new Map<THREE.Material, THREE.Mesh[]>();
+    for (const child of group.children) {
+      if (!(child instanceof THREE.Mesh) || child instanceof THREE.InstancedMesh || keep.has(child) || Array.isArray(child.material)) continue;
+      const list = byMaterial.get(child.material) ?? [];
+      list.push(child);
+      byMaterial.set(child.material, list);
+    }
+    for (const [material, meshes] of byMaterial) {
+      if (meshes.length < 2) continue;
+      const parts = meshes.map(m => {
+        m.updateMatrix();
+        // All shared geometries are indexed, so the merged parts line up.
+        return m.geometry.clone().applyMatrix4(m.matrix);
+      });
+      const merged = mergeGeometries(parts);
+      for (const part of parts) part.dispose();
+      if (!merged) continue;
+      for (const m of meshes) group.remove(m);
+      group.add(new THREE.Mesh(merged, material));
+    }
+  }
 }
 
 export function mesh(

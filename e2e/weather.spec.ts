@@ -124,7 +124,7 @@ test.describe('windshield', () => {
       const outside = await page.evaluate(() => {
         const { cockpit, stage } = window.__drivey;
         stage.camera.updateMatrixWorld(true);
-        return cockpit.glassOccluders.slice(2, 4).map((o: any) => {
+        return cockpit.pillars.map((o: any) => {
           const [bottomInner, topInner, topOuter] = o.points.map((p: any) => {
             const v = o.object.localToWorld(p.clone()).project(stage.camera);
             return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
@@ -145,6 +145,21 @@ test.describe('windshield', () => {
       expect(await glassPixels(page)).toBeGreaterThan(50);
     });
   }
+
+  test('empty glass is left alone rather than repainted every frame', async ({ page }) => {
+    await openApp(page, { weather: 'clear' });
+    await advance(page, 2);
+    const clears = await page.evaluate(() => {
+      const { windshield } = window.__drivey;
+      let n = 0;
+      const ctx = windshield.ctx, clear = ctx.clearRect.bind(ctx);
+      ctx.clearRect = (...a: [number, number, number, number]) => { n++; clear(...a); };
+      for (let i = 0; i < 20; i++) windshield.draw();
+      ctx.clearRect = clear;
+      return n;
+    });
+    expect(clears).toBeLessThanOrEqual(1);
+  });
 
   test('where two parts of the car overlap, the glass stays clear of both', async ({ page }) => {
     await openApp(page, { weather: 'heavy' });

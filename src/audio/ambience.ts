@@ -1,8 +1,8 @@
-import type { EngineState } from '../app/engine';
+import type { EngineState } from '../app/carEngine';
 import { rand } from '../lib/math';
 import type { RouteId } from '../routes';
 import type { Weather } from '../weather/tables';
-import type { AudioEngine, AudioGraph, Channel, Mix } from './engine';
+import type { AudioEngine, AudioGraph, Channel, Mix } from './audioEngine';
 import { filter, loop } from './nodes';
 
 export type AmbientChannel = Exclude<Channel, 'music'>;

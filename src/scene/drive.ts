@@ -1,4 +1,4 @@
-import type { EngineState } from '../app/engine';
+import type { EngineState } from '../app/carEngine';
 import { damp, lerp, rand } from '../lib/math';
 import type { RouteDefinition } from '../routes/types';
 import type { Backdrop } from './backdrop';

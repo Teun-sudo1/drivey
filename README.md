@@ -26,6 +26,8 @@ npx playwright test --project=phone-portrait
 npx playwright test -g "wipers"
 ```
 
+The full run takes about 2½ minutes on six parallel browsers.
+
 The tests use a separate build (`npm run build:e2e`) that exposes scene state on `window.__drivey`; the public build doesn't include it. GitHub doesn't run the browser tests, so deploys take about a minute: run the full `npm run test:e2e` locally and only push when it passes.
 
 When adding a feature, add its test in `e2e/`, then break the feature on purpose to check that the test fails.
@@ -64,17 +66,38 @@ Rain on glass, engine hum, wipers, traffic and wind are generated with Web Audio
 
 | Folder | Contents |
 | --- | --- |
-| `src/app` | Frame loop and persisted settings |
-| `src/scene` | Renderer, chunk pool, cockpit, drive motion, post-processing |
-| `src/routes` | One definition per route, plus shared road parts |
+| `src/app` | Frame loop, persisted settings, and the car's ignition state |
+| `src/scene` | Renderer, road chunks, road surface, drive motion, post-processing |
+| `src/scene/cockpit` | Interior: gauges, timer display, nav screen, mirror, volume fader |
+| `src/routes` | One file per route, plus shared road parts |
 | `src/traffic` | Cars and trucks, their lanes, lane changes and spacing |
-| `src/audio` | Web Audio engine: mixer channels, ambience, effects and generated music |
-| `src/music` | The music player and its styles |
-| `src/weather` | Time-of-day and weather tables, and the environment that blends them |
-| `src/timer` | Timestamp-based Pomodoro state machine and its driver |
-| `src/ui` | HUD, settings surface, shortcuts and styles |
+| `src/weather` | Time of day and weather, rain and snow, the windshield |
+| `src/audio` | Web Audio engine, mixer channels, ambience and effects |
+| `src/music` | Generated beats: the player, the generator and the styles |
+| `src/timer` | Timestamp-based Pomodoro and its driver |
+| `src/ui` | Start screen and key, HUD, settings panel, shortcuts, styles |
 | `src/platform` | Browser adapter; a Capacitor implementation plugs in here |
 | `src/lib` | Small shared helpers |
+| `e2e` | Browser tests, one file per feature; `support.ts` has the helpers |
+
+### Where to find things
+
+| To change… | Look in |
+| --- | --- |
+| The start screen and the ignition key | `src/ui/startScreen.ts`, `src/ui/ignition.ts` |
+| What a route looks like, its speed and traffic | `src/routes/<route>.ts` |
+| Tunnels | `src/routes/highway.ts`, `src/scene/chunkPool.ts` |
+| Wet and snowy road, reflections | `src/scene/roadSurface.ts` |
+| Raindrops, wipers and their clipping | `src/weather/windshield.ts` |
+| Time-of-day and weather values | `src/weather/tables.ts`, `src/weather/environment.ts` |
+| Camera framing per orientation, mirror and fader placement | `src/scene/stage.ts` |
+| Gauges, timer display, nav screen | `src/scene/cockpit/` |
+| The volume fader | `src/scene/cockpit/volumeFader.ts`, `src/ui/dashVolume.ts` |
+| Music styles and their patterns | `src/music/styles.ts` |
+| Rain, engine, wind and traffic sounds | `src/audio/ambience.ts` |
+| Wiper swish, chime, key clicks | `src/audio/effects.ts` |
+| Settings and their defaults | `src/app/settings.ts` |
+| How everything is wired together | `src/main.ts` |
 
 ## Hosting
 

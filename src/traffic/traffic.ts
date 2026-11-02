@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { damp, lerp, pick, rand } from '../lib/math';
 import type { RouteDefinition } from '../routes/types';
 import { bendTree } from '../scene/bend';
+import { disposeTree, mergeStatic } from '../scene/geometry';
 import { CAR_GLOWS, CAR_LENGTH, TRUCK_LENGTH, makeVehicle } from './cars';
 
 const TRUCK_SHARE = 0.15;
@@ -55,7 +56,11 @@ export class Traffic {
 
   setRoute(route: RouteDefinition): void {
     this.route = route;
-    for (const v of this.vehicles) this.group.remove(v.group);
+    for (const v of this.vehicles) {
+      this.group.remove(v.group);
+      // Each car's merged body is its own geometry.
+      disposeTree(v.group);
+    }
     this.vehicles = [];
     const { aheadCount, oncomingCount } = route.traffic;
     for (let i = 0; i < aheadCount; i++) this.add(false, rand(30, 380));
@@ -117,6 +122,7 @@ export class Traffic {
   private add(oncoming: boolean, distance: number): void {
     const truck = Math.random() < TRUCK_SHARE;
     const group = makeVehicle(truck);
+    mergeStatic(group);
     bendTree(group);
     this.group.add(group);
     const v: Vehicle = { group, length: truck ? TRUCK_LENGTH : CAR_LENGTH, oncoming, z: 0, speed: 0, cruise: 0, floor: 0, lane: 0, fromLane: 0, shift: 1, changeTimer: 0 };

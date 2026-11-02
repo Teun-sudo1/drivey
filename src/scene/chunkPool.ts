@@ -3,7 +3,7 @@ import { pick, rand } from '../lib/math';
 import { CHUNK_LENGTH } from '../routes/parts';
 import type { Chunk, RouteDefinition } from '../routes/types';
 import { bendTree } from './bend';
-import { disposeTree } from './geometry';
+import { disposeTree, mergeStatic } from './geometry';
 import { WINDOW_MATERIALS } from './materials';
 
 const CHUNK_COUNT = 14;
@@ -64,6 +64,8 @@ export class ChunkPool {
     for (let i = 0; i < CHUNK_COUNT; i++) {
       const chunk: Chunk = { group: new THREE.Group(), lamps: [], extras: [], buildings: [], labels: [], openAir: [] };
       route.buildChunk(chunk, i);
+      // Buildings get new materials, signs flip with the driving side and some scenery hides in tunnels.
+      mergeStatic(chunk.group, new Set([...chunk.buildings, ...chunk.labels, ...chunk.openAir]));
       chunk.group.position.z = CHUNK_LENGTH - i * CHUNK_LENGTH;
       bendTree(chunk.group);
       this.refresh(chunk, false);

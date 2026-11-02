@@ -7,9 +7,9 @@ import './ui/styles/layout.css';
 import './ui/styles/components.css';
 
 import { Ambience } from './audio/ambience';
-import { AudioEngine } from './audio/engine';
+import { AudioEngine } from './audio/audioEngine';
 import { Effects } from './audio/effects';
-import { Engine } from './app/engine';
+import { CarEngine } from './app/carEngine';
 import { startLoop } from './app/loop';
 import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type ToggleKey } from './app/settings';
 import { MusicPlayer } from './music/player';
@@ -51,7 +51,7 @@ const settings = await SettingsStore.load(platform.storage);
 
 /* Scene */
 let route = ROUTES[settings.value.route];
-const engine = new Engine();
+const engine = new CarEngine();
 const stage = new Stage($<HTMLCanvasElement>('#gl'));
 const postfx = new PostFx(stage);
 const lights = createLights(stage.scene);

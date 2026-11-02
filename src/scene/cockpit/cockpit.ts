@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { EngineState } from '../../app/engine';
+import type { EngineState } from '../../app/carEngine';
 import { damp, lerp } from '../../lib/math';
 import { hideFromReflection } from '../roadSurface';
 import { BOX, mesh } from '../geometry';
@@ -37,6 +37,8 @@ export class Cockpit {
   /** Music volume, 0 to 1, as the fader shows it. */
   volume = 0;
   readonly glassOccluders: GlassOccluder[];
+  /** The A-pillars' outlines, which mark where the glass ends at the sides. */
+  readonly pillars: GlassOccluder[];
 
   private readonly root = new THREE.Group();
   private readonly screens: THREE.Mesh[];
@@ -95,13 +97,13 @@ export class Cockpit {
     this.passLight.position.set(-0.2, 0.55, -0.5);
     root.add(this.dashLight, this.passLight);
 
-    const pillars = this.addPillars(root, intB);
+    this.pillars = this.addPillars(root, intB);
     hideFromReflection(root);
 
     const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
     this.glassOccluders = [
       ...this.mirror.occluders,
-      ...pillars,
+      ...this.pillars,
       { object: this.fader.group, points: this.fader.outline },
       { object: navUnit, points: [V(-0.1, -0.145, 0), V(0.1, -0.145, 0), V(0.1, 0.145, 0), V(-0.1, 0.145, 0)] },
       { object: root, points: [V(-0.29, -0.265, -1.02), V(0.29, -0.265, -1.02), V(0.29, -0.5, -0.9), V(-0.29, -0.5, -0.9)] }

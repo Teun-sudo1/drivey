@@ -1,5 +1,5 @@
-import type { AudioEngine, AudioGraph } from '../audio/engine';
-import { GeneratedMusic } from '../audio/generatedMusic';
+import type { AudioEngine, AudioGraph } from '../audio/audioEngine';
+import { GeneratedMusic } from './generator';
 import type { StyleId } from './styles';
 
 const CROSSFADE_SECONDS = 4;

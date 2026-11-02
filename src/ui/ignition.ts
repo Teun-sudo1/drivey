@@ -1,4 +1,4 @@
-import type { Engine, EngineState } from '../app/engine';
+import type { CarEngine, EngineState } from '../app/carEngine';
 
 /** Key angles in degrees, matching the labels drawn on the barrel in index.html. */
 const LOCK = -45;
@@ -44,7 +44,7 @@ function restingAngle(angle: number): number {
  * it at START long enough and the engine catches; let go early and it springs
  * back to ON so you can try again.
  */
-export function createIgnition(button: HTMLElement, keyBody: SVGElement, keyTag: SVGElement, engine: Engine): void {
+export function createIgnition(button: HTMLElement, keyBody: SVGElement, keyTag: SVGElement, engine: CarEngine): void {
   let angle = LOCK;
   let target = LOCK;
   let dragging = false;

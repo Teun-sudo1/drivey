@@ -121,6 +121,8 @@ class CanvasWindshield implements Windshield {
   private wetGlass = false;
   private mirrored = false;
   private readonly strokeListeners: (() => void)[] = [];
+  /** Whether the last frame drew nothing, so an empty glass isn't cleared over and over. */
+  private blank = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -155,6 +157,8 @@ class CanvasWindshield implements Windshield {
   private syncSize(): void {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     if (w === this.width && h === this.height) return;
+    // Resizing wipes the canvas, so the next frame must paint even if the glass is empty.
+    this.blank = false;
     const dpr = Math.min(devicePixelRatio, 2);
     this.width = w;
     this.height = h;
@@ -276,6 +280,9 @@ class CanvasWindshield implements Windshield {
   }
 
   draw(): void {
+    const empty = this.drops.length === 0 && this.veil <= 0.001 && this.wiperAngle === WIPER_PARKED && this.wiperPeriod === 0;
+    if (empty && this.blank) return;
+    this.blank = empty;
     const g = this.ctx;
     g.clearRect(0, 0, this.width, this.height);
     g.save();

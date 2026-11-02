@@ -1,4 +1,4 @@
-import { CHANNELS, type Mix } from '../audio/engine';
+import { CHANNELS, type Mix } from '../audio/audioEngine';
 import { clamp } from '../lib/math';
 import { STYLES, type StyleId } from '../music/styles';
 import type { KeyValueStorage } from '../platform/types';

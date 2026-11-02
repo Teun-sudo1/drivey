@@ -1,4 +1,4 @@
-import type { Engine, EngineState } from '../app/engine';
+import type { CarEngine, EngineState } from '../app/carEngine';
 import { $ } from './dom';
 import { createIgnition } from './ignition';
 
@@ -16,7 +16,7 @@ export interface StartScreen {
 }
 
 /** Opens parked: set up the drive first, then start the engine with the key. */
-export function createStartScreen(engine: Engine): StartScreen {
+export function createStartScreen(engine: CarEngine): StartScreen {
   const screen = $('#start'), key = $('#ignition'), status = $('#ignitionStatus');
   const keyBody = document.querySelector<SVGElement>('#keyBody'), keyTag = document.querySelector<SVGElement>('#keyTag');
   if (!keyBody || !keyTag) throw new Error('Missing key artwork');

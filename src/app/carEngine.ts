@@ -1,7 +1,7 @@
 export type EngineState = 'off' | 'acc' | 'on' | 'cranking' | 'running';
 
 /** The car's ignition state, driven by the key on the start screen. */
-export class Engine {
+export class CarEngine {
   private current: EngineState = 'off';
   private readonly listeners = new Set<(state: EngineState) => void>();
 
