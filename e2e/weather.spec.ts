@@ -199,14 +199,66 @@ test.describe('windshield', () => {
 });
 
 test.describe('road surface', () => {
-  test('the reflection keeps a half-size blurred copy, which smears small lights without stripes', async ({ page }) => {
-    await openApp(page, { route: 'city', tod: 'night', weather: 'rain' });
-    await advance(page, 3);
-    // Reading a full-size reflection two texels at a time splits small lights into ladders of stripes.
-    expect(await page.evaluate(() => {
-      const { texture } = window.__drivey.roadSurface.target;
-      return { mipmaps: texture.generateMipmaps, filter: texture.minFilter };
-    })).toEqual({ mipmaps: true, filter: 1008 });
+  test('small lights smear smoothly in the wet road, without stripes', async ({ page }) => {
+    await openApp(page, { route: 'highway', tod: 'night', weather: 'heavy', quality: 'high' });
+    await advance(page, 8);
+    // The reflection gets thin bright lines, far enough apart that each smear stands alone, and the
+    // road below the horizon is read in one column, with and without them, in the same frame.
+    const profile: number[] = await page.evaluate(() => {
+      const { roadSurface, stage, postfx } = window.__drivey, { renderer } = stage, target = roadSurface.target;
+      const empty = new stage.scene.constructor();
+      const fill = (rows: number[]) => {
+        const colour = renderer.getClearColor(stage.camera.position.clone()), alpha = renderer.getClearAlpha(), auto = renderer.autoClear;
+        renderer.setRenderTarget(target);
+        renderer.setClearColor(0x000000, 1);
+        renderer.clear();
+        renderer.setScissorTest(true);
+        renderer.setClearColor(0xffffff, 1);
+        for (const y of rows) {
+          renderer.setScissor(0, y, target.width, 1);
+          renderer.clear();
+        }
+        renderer.setScissorTest(false);
+        renderer.setScissor(0, 0, target.width, target.height);
+        // Rendering nothing resolves the multisampling and rebuilds the half-size copy.
+        renderer.autoClear = false;
+        renderer.render(empty, stage.camera);
+        renderer.autoClear = auto;
+        renderer.setRenderTarget(null);
+        renderer.setClearColor(colour, alpha);
+      };
+      const gl = document.querySelector<HTMLCanvasElement>('#gl')!;
+      const column = () => {
+        postfx.render(false);
+        const c = document.createElement('canvas');
+        c.width = 1;
+        c.height = gl.height;
+        const g = c.getContext('2d', { willReadFrequently: true })!;
+        g.drawImage(gl, Math.round(gl.width / 2), 0, 1, gl.height, 0, 0, 1, gl.height);
+        const d = g.getImageData(0, 0, 1, gl.height).data, out: number[] = [];
+        for (let i = 0; i < d.length; i += 4) out.push(d[i] + d[i + 1] + d[i + 2]);
+        return out;
+      };
+      fill([]);
+      const dark = column();
+      const rows: number[] = [];
+      for (let y = 4; y < target.height; y += 40) rows.push(y);
+      fill(rows);
+      return column().map((v, i) => v - dark[i]);
+    });
+    // Split into smears, and walk each one: a smooth smear rises once and falls once, a striped one zigzags.
+    const smears: number[][] = [];
+    let run: number[] = [];
+    for (const v of [...profile, 0]) {
+      if (v > 2) run.push(v);
+      else if (run.length) smears.push(run), (run = []);
+    }
+    const big = smears.filter(s => Math.max(...s) > 40);
+    expect(big.length).toBeGreaterThan(0);
+    for (const s of big) {
+      const travel = s.reduce((sum, v, i) => sum + Math.abs(v - (s[i - 1] ?? 0)), s.at(-1)!);
+      expect(travel / (2 * Math.max(...s))).toBeLessThan(1.3);
+    }
   });
 
   test('wet roads get a real reflection, dry roads skip the work', async ({ page }) => {

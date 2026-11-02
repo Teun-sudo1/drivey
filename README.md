@@ -77,7 +77,7 @@ The radio on the dash is the music player: each style is a station on the dial (
 
 ## Following the session
 
-With "Scene follows the session" on (Settings › Timer), the light moves on as you focus: over a focus block the scene eases towards the next, later time of day, which stays once the block ends. On a long break the car pulls off the road into a lit rest stop and waits there until focus starts again. Each finished focus block shows a short card with the task, its minutes, today's total and the streak, and the chime for the end of a phase is booked on the audio clock as it starts, so it rings on time in a background tab.
+With "Scene follows the session" on (Settings › Timer), the light moves on as you focus: over a focus block the scene eases towards the next, later time of day, which stays once the block ends. On a long break the car pulls off the road into a lit rest stop and waits there until focus starts again. Each finished focus block shows a short card with the task, its minutes, today's total and the streak, and the chime for the end of a phase is booked on the audio clock as it starts, so it rings on time in a background tab. On an iPhone, Safari keeps Drivey's sound playing with the screen locked or another app in front, as it does for music, so the chime still rings there; like a music app, it plays even with the ring/silent switch on silent.
 
 ## Quality
 

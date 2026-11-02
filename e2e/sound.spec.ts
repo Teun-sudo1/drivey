@@ -18,6 +18,15 @@ test.describe('sound', () => {
     await expect.poll(() => page.evaluate(() => window.__drivey.audio.graph?.ctx.state)).toBe('running');
   });
 
+  test('on Safari the sound is playback, so it carries on behind the lock screen', async ({ page }) => {
+    await openParked(page);
+    const type = () => page.evaluate(() => (navigator as any).audioSession?.type ?? 'unsupported');
+    test.skip((await type()) === 'unsupported', 'only Safari has an audio session');
+    expect(await type()).toBe('auto');
+    await page.click('#startTod button:has-text("Dusk")');
+    expect(await type()).toBe('playback');
+  });
+
   test('the starter turns over while cranking, then the engine hums', async ({ page }) => {
     await openParked(page, { weather: 'clear' });
     await page.click('#btnGetIn');
