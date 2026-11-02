@@ -75,6 +75,7 @@ export class Drive {
     );
     this.cockpit.roof.position.y = framing.roofY;
     this.cockpit.mirror.place(framing);
+    this.cockpit.fader.place(framing);
     this.cockpit.steer(this.bend);
   }
 }

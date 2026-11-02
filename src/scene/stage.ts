@@ -13,7 +13,7 @@ const EYE_HEIGHT = 1.22;
 const NEAR = 0.15; // far enough out to keep depth precision for the road decals
 const REFRAME_RATE = 6;
 
-const FRAMING_KEYS = ['fov', 'pitch', 'roofY', 'mirrorX', 'mirrorY', 'mirrorYaw'] as const;
+const FRAMING_KEYS = ['fov', 'pitch', 'roofY', 'mirrorX', 'mirrorY', 'mirrorYaw', 'faderX', 'faderY', 'faderZ', 'faderTilt', 'faderScale'] as const;
 
 /** How the camera frames the car in each orientation. */
 export interface Framing {
@@ -23,10 +23,24 @@ export interface Framing {
   mirrorX: number;
   mirrorY: number;
   mirrorYaw: number;
+  /** Where the volume fader sits, and how big it is: on the left of the dash, or above the gauges in portrait. */
+  faderX: number;
+  faderY: number;
+  faderZ: number;
+  faderTilt: number;
+  faderScale: number;
 }
-const LANDSCAPE: Framing = { fov: 55, pitch: -0.04, roofY: 0, mirrorX: -0.33, mirrorY: 0.29, mirrorYaw: 0.12 };
+const LANDSCAPE: Framing = {
+  fov: 55, pitch: -0.04, roofY: 0, mirrorX: -0.33, mirrorY: 0.29, mirrorYaw: 0.12,
+  // On its own pod, on top of the timer display's housing.
+  faderX: -0.58, faderY: -0.352, faderZ: -0.975, faderTilt: -0.2, faderScale: 1
+};
 /** The roof is framed out of view here, so the mirror hangs just below the top bar instead; see targetFraming. */
-const PORTRAIT: Framing = { fov: 70, pitch: 0.07, roofY: 0.42, mirrorX: -0.03, mirrorY: 0, mirrorYaw: 0.03 };
+const PORTRAIT: Framing = {
+  fov: 70, pitch: 0.07, roofY: 0.42, mirrorX: -0.03, mirrorY: 0, mirrorYaw: 0.03,
+  // The timer display is out of view here, so it sits on the dash top, left of centre.
+  faderX: -0.1, faderY: -0.25, faderZ: -0.93, faderTilt: -0.26, faderScale: 0.82
+};
 
 export class Stage {
   readonly renderer: THREE.WebGLRenderer;

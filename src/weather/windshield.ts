@@ -305,18 +305,19 @@ class CanvasWindshield implements Windshield {
     g.beginPath();
     g.rect(0, this.top, this.width, this.bottom - this.top);
     g.clip();
-    // A separate clip, because with even-odd any occluder reaching past the glass would add area instead of removing it.
-    g.beginPath();
-    g.rect(0, 0, this.width, this.height);
+    // One clip per occluder: with a single even-odd path, any two that overlap, or one reaching past the
+    // glass, would cancel out and let rain show through where they meet.
     for (const { object, points } of this.occluders) {
+      g.beginPath();
+      g.rect(0, 0, this.width, this.height);
       points.forEach((p, i) => {
         const s = this.project(p.x, p.y, p.z, object);
         if (i === 0) g.moveTo(s.x, s.y);
         else g.lineTo(s.x, s.y);
       });
       g.closePath();
+      g.clip('evenodd');
     }
-    g.clip('evenodd');
   }
 
   private drawTrails(): void {

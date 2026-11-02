@@ -146,6 +146,29 @@ test.describe('windshield', () => {
     });
   }
 
+  test('where two parts of the car overlap, the glass stays clear of both', async ({ page }) => {
+    await openApp(page, { weather: 'heavy' });
+    // Two overlapping panels in front of the glass, as the interior's parts can be, beside a bare patch of glass.
+    const areas = await page.evaluate(() => {
+      const { cockpit, stage } = window.__drivey;
+      const camera = stage.camera;
+      const V = (x: number, y: number) => camera.position.clone().set(x, y, -1);
+      cockpit.glassOccluders.push(
+        { object: camera, points: [V(-0.3, -0.2), V(0.1, -0.2), V(0.1, 0.25), V(-0.3, 0.25)] },
+        { object: camera, points: [V(-0.2, -0.25), V(0.2, -0.25), V(0.2, 0.2), V(-0.2, 0.2)] }
+      );
+      camera.updateMatrixWorld(true);
+      const rect = (x0: number, y0: number, x1: number, y1: number) => {
+        const a = camera.localToWorld(V(x0, y1)).project(camera), b = camera.localToWorld(V(x1, y0)).project(camera);
+        return { left: (a.x * 0.5 + 0.5) * innerWidth + 3, right: (b.x * 0.5 + 0.5) * innerWidth - 3, top: (0.5 - a.y * 0.5) * innerHeight + 3, bottom: (0.5 - b.y * 0.5) * innerHeight - 3 };
+      };
+      return { overlap: rect(-0.2, -0.2, 0.1, 0.2), bare: rect(-0.2, 0.3, 0.1, 0.7) };
+    });
+    await advance(page, 6);
+    expect(await glassPixels(page, areas.bare)).toBeGreaterThan(0);
+    expect(await glassPixels(page, areas.overlap)).toBe(0);
+  });
+
   test('nothing on the glass is drawn over the mirror or below the dashboard', async ({ page }) => {
     await openApp(page, { weather: 'heavy' });
     await advance(page, 3);

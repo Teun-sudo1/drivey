@@ -7,6 +7,7 @@ import { createGauges } from './gauges';
 import { createLcd } from './lcd';
 import { Mirror } from './mirror';
 import { createNav } from './nav';
+import { VolumeFader } from './volumeFader';
 
 const GAUGE_INTERVAL = 0.1;
 const NAV_INTERVAL = 0.25;
@@ -14,8 +15,8 @@ const SWEEP_SECONDS = 1.2;
 /** Far enough in that the display stays fully on screen at a 16:10 laptop's aspect ratio. */
 const LCD_X = -0.58;
 const SCREEN_POWER_RATE = 6;
-/** Full brightness of the gauges, LCD and nav screen. */
-const SCREEN_LEVELS = [1, 1, 0.73];
+/** Full brightness of the gauges, LCD, nav screen and volume fader. */
+const SCREEN_LEVELS = [1, 1, 0.73, 1];
 const PILLAR_WIDTH = 0.11;
 
 /** Part of the interior that sits in front of the windshield, as a polygon local to `object`. */
@@ -32,6 +33,9 @@ export class Cockpit {
   readonly roof = new THREE.Group();
   readonly wheel = new THREE.Group();
   readonly mirror: Mirror;
+  readonly fader: VolumeFader;
+  /** Music volume, 0 to 1, as the fader shows it. */
+  volume = 0;
   readonly glassOccluders: GlassOccluder[];
 
   private readonly root = new THREE.Group();
@@ -84,6 +88,8 @@ export class Cockpit {
     root.add(this.roof);
     mesh(BOX, intB, -0.35, 0.52, -0.82, 2.8, 0.07, 0.55, this.roof);
     this.mirror = new Mirror(root, intB);
+    this.fader = new VolumeFader(root, intB);
+    this.screens.push(this.fader.face);
 
     this.dashLight.position.set(0, -0.36, -0.82);
     this.passLight.position.set(-0.2, 0.55, -0.5);
@@ -96,6 +102,7 @@ export class Cockpit {
     this.glassOccluders = [
       ...this.mirror.occluders,
       ...pillars,
+      { object: this.fader.group, points: this.fader.outline },
       { object: navUnit, points: [V(-0.1, -0.145, 0), V(0.1, -0.145, 0), V(0.1, 0.145, 0), V(-0.1, 0.145, 0)] },
       { object: root, points: [V(-0.29, -0.265, -1.02), V(0.29, -0.265, -1.02), V(0.29, -0.5, -0.9), V(-0.29, -0.5, -0.9)] }
     ];
@@ -126,6 +133,7 @@ export class Cockpit {
       this.power = power;
       this.screens.forEach((s, i) => (s.material as THREE.MeshBasicMaterial).color.setScalar(power * SCREEN_LEVELS[i]));
     }
+    this.fader.draw(this.volume);
     this.sweepLeft = Math.max(0, this.sweepLeft - dt);
     this.gaugeTimer += dt;
     if (this.gaugeTimer >= GAUGE_INTERVAL) {
@@ -156,6 +164,7 @@ export class Cockpit {
   }
 
   invalidateText(): void {
+    this.fader.invalidate();
     this.lcdKey = '';
     this.gaugeTimer = GAUGE_INTERVAL;
     this.navTimer = NAV_INTERVAL;

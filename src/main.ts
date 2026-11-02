@@ -31,6 +31,7 @@ import { $ } from './ui/dom';
 import { toggleFullscreen } from './ui/fullscreen';
 import { createHud, phaseName } from './ui/hud';
 import { createIdleFade } from './ui/idle';
+import { bindDashVolume } from './ui/dashVolume';
 import { bindShortcuts } from './ui/shortcuts';
 import { createSoundPanel } from './ui/soundPanel';
 import { createStartScreen } from './ui/startScreen';
@@ -141,6 +142,13 @@ const sceneControls = [
   ...[$('#segWeather'), $('#startWeather')].map(el => mountSegmented<WeatherId>(el, options(WEATHERS), () => settings.value.weather, weather => settings.update({ weather })))
 ];
 const refreshSoundPanel = createSoundPanel(settings, player);
+const showDashVolume = bindDashVolume($<HTMLCanvasElement>('#gl'), stage.camera, cockpit.fader, $<HTMLInputElement>('#dashVolume'), music => settings.update({ mix: { ...settings.value.mix, music } }));
+function applyVolume(): void {
+  cockpit.volume = settings.value.mix.music;
+  showDashVolume(cockpit.volume);
+}
+settings.onChange(applyVolume);
+applyVolume();
 settings.onChange(() => {
   hud.render();
   for (const refresh of sceneControls) refresh();
