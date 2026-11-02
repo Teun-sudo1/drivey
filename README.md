@@ -42,6 +42,10 @@ Type what you're working on under Settings › Timer ("What are you focusing on?
 
 Settings › Stats shows minutes today and over the last seven days, the daily streak, a bar chart of the last 7 or 30 days, and the latest sessions. Export saves the history as a JSON file; Import reads one back and merges it, replacing sessions it already has, so importing the same file twice doesn't double anything. Clear history asks for a second tap.
 
+## Where you sit
+
+The first visit starts with the windows steamed up and the roof light on, and asks where you sit: close to the wheel, with big gauges and radio, or sat back, which shows more of the car. The glass clears once you settle in, so the scenery stays a surprise until then. Auto, in Settings › Scene, sits close on phones and back on bigger screens.
+
 ## Install and offline
 
 Drivey is an installable web app. On an iPhone, open it in Safari and choose Share › Add to Home Screen; in Chrome or Edge, use the install button in the address bar. It then opens full screen with its own icon.

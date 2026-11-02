@@ -90,6 +90,8 @@ body.parked #hud { visibility: hidden; }
   transition: opacity .9s;
 }
 #start.gone { opacity: 0; pointer-events: none; }
+/* Picking a seat: the card sits over the steamed-up glass, leaving the cabin below in view. */
+#start[data-step="seat"] { background: none; place-items: start center; }
 #start:not([data-step="seat"]) #startSeat, #start:not([data-step="setup"]) #startSetup, #start:not([data-step="key"]) #startKey { display: none; }
 #start.cranking #ignition svg { animation: crank .09s linear infinite; }
 body.reduced #start.cranking #ignition svg { animation: none; }

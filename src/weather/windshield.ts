@@ -136,6 +136,7 @@ class CanvasWindshield implements Windshield {
     private readonly camera: THREE.Camera,
     private readonly roof: THREE.Object3D,
     private readonly occluders: readonly GlassOccluder[],
+    private readonly sideWindows: readonly GlassOccluder[],
     private lampTint: LampTint
   ) {
     const ctx = canvas.getContext('2d');
@@ -318,6 +319,23 @@ class CanvasWindshield implements Windshield {
     this.drawSmear();
     if (this.wiperAngle !== WIPER_PARKED || this.wiperPeriod > 0) this.drawWipers();
     g.restore();
+    if (this.mist > 0) this.mistSideWindows();
+  }
+
+  /** Rain stays off the side windows, but they steam up along with the windshield. */
+  private mistSideWindows(): void {
+    const g = this.ctx;
+    g.fillStyle = `rgba(110,118,130,${this.mist})`;
+    for (const { object, points } of this.sideWindows) {
+      g.beginPath();
+      points.forEach((p, i) => {
+        const s = this.project(p.x, p.y, p.z, object);
+        if (i === 0) g.moveTo(s.x, s.y);
+        else g.lineTo(s.x, s.y);
+      });
+      g.closePath();
+      g.fill();
+    }
   }
 
   /** Between roof and dash, minus whatever sits inside the car in front of the glass. */
@@ -368,8 +386,8 @@ class CanvasWindshield implements Windshield {
   /** Condensation: thickest up top, thinning towards the vents at the bottom of the glass. */
   private drawMist(): void {
     const g = this.ctx, fade = g.createLinearGradient(0, this.top, 0, this.bottom);
-    fade.addColorStop(0, `rgba(122,130,142,${0.97 * this.mist})`);
-    fade.addColorStop(1, `rgba(96,104,116,${0.9 * this.mist})`);
+    fade.addColorStop(0, `rgba(122,130,142,${this.mist})`);
+    fade.addColorStop(1, `rgba(96,104,116,${this.mist})`);
     g.fillStyle = fade;
     g.fillRect(0, this.top, this.width, this.bottom - this.top);
   }
@@ -416,7 +434,8 @@ export function createWindshield(
   camera: THREE.Camera,
   roof: THREE.Object3D,
   occluders: readonly GlassOccluder[],
+  sideWindows: readonly GlassOccluder[],
   lampTint: LampTint
 ): Windshield {
-  return new CanvasWindshield(canvas, camera, roof, occluders, lampTint);
+  return new CanvasWindshield(canvas, camera, roof, occluders, sideWindows, lampTint);
 }

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { EngineState } from '../../app/carEngine';
 import { damp, lerp } from '../../lib/math';
 import { hideFromReflection } from '../roadSurface';
-import { BOX, PLANE, mesh } from '../geometry';
+import { BOX, PLANE, mergeStatic, mesh } from '../geometry';
 import { createGauges } from './gauges';
 import { createLcd } from './lcd';
 import { Mirror } from './mirror';
@@ -19,6 +19,18 @@ const DIAL_RATE = 5;
 /** Full brightness of the gauges, LCD, nav screen and radio. */
 const SCREEN_LEVELS = [1, 1, 0.73, 1];
 const PILLAR_WIDTH = 0.11;
+/** The roof light's brightness, and how quickly it fades like an old bulb. */
+const CABIN_LIGHT = 7;
+const CABIN_FADE_RATE = 2.5;
+/** Each A-pillar's foot and head, and which way is out of the car. */
+const PILLAR_ENDS: [THREE.Vector3, THREE.Vector3, number][] = [
+  [new THREE.Vector3(-1.25, -0.47, -1.38), new THREE.Vector3(-0.98, 0.5, -0.78), -1],
+  [new THREE.Vector3(0.66, -0.47, -1.38), new THREE.Vector3(0.52, 0.5, -0.78), 1]
+];
+/** The door sill, where the side windows start. */
+const SILL_Y = -0.42;
+/** Where the side windows stop being drawn: just ahead of the eye, since points behind it would project flipped. */
+const SIDE_WINDOW_END = -0.05;
 /** Where the lever leaves the console, how far it leans back, and its reach up into the gap between radio and wheel. */
 const GEAR_LEVER = { x: -0.36, y: -0.64, z: -0.6, lean: 0.25, length: 0.24, knob: 0.032 };
 
@@ -33,6 +45,9 @@ export class Cockpit {
   readonly dashLight = new THREE.PointLight(0xff9a50, 0.1, 0.8, 2);
   // Short range: it lights the interior but must not reach the road, 1.77 below it.
   readonly passLight = new THREE.PointLight(0xffffff, 0, 1.7, 1.5);
+  /** The roof light, on while the driver settles in; short range, so it stays off the road. */
+  readonly cabinLight = new THREE.PointLight(0xffd6a0, 0, 1.5, 1.5);
+  private cabinLevel = 0;
   readonly roof = new THREE.Group();
   readonly wheel = new THREE.Group();
   /** The long 80s lever, rising between the seats into the lower corner of the view. */
@@ -44,6 +59,8 @@ export class Cockpit {
   readonly glassOccluders: GlassOccluder[];
   /** The A-pillars' outlines, which mark where the glass ends at the sides. */
   readonly pillars: GlassOccluder[];
+  /** The side windows beyond the pillars, down to the door sills. */
+  readonly sideWindows: GlassOccluder[];
 
   private readonly root = new THREE.Group();
   private readonly screens: THREE.Mesh[];
@@ -68,11 +85,14 @@ export class Cockpit {
     const intA = new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.85 });
     const intB = new THREE.MeshStandardMaterial({ color: 0x0a0b0d, roughness: 0.95 });
 
-    mesh(BOX, intA, -0.35, -0.69, -1.16, 2.5, 0.44, 0.42, root);
-    mesh(BOX, intA, -0.35, -0.86, -0.85, 2.5, 0.3, 0.3, root);
-    mesh(BOX, intB, -0.35, -0.48, -1.4, 2.6, 0.04, 0.12, root);
-    mesh(BOX, intB, 0, -0.285, -0.95, 0.58, 0.04, 0.14, root).rotation.x = 0.18;
-    mesh(BOX, intB, 0, -0.4, -0.92, 0.58, 0.19, 0.05, root);
+    // Everything fixed in place, merged by material once built so the whole cabin costs a few draw calls.
+    const cabin = new THREE.Group();
+    root.add(cabin);
+    mesh(BOX, intA, -0.35, -0.69, -1.16, 2.5, 0.44, 0.42, cabin);
+    mesh(BOX, intA, -0.35, -0.86, -0.85, 2.5, 0.3, 0.3, cabin);
+    mesh(BOX, intB, -0.35, -0.48, -1.4, 2.6, 0.04, 0.12, cabin);
+    mesh(BOX, intB, 0, -0.285, -0.95, 0.58, 0.04, 0.14, cabin).rotation.x = 0.18;
+    mesh(BOX, intB, 0, -0.4, -0.92, 0.58, 0.19, 0.05, cabin);
 
     const screen = (texture: THREE.Texture) => new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, color: 0x000000 });
     const gaugeScreen = mesh(new THREE.PlaneGeometry(0.5, 0.164), screen(this.gauges.texture), 0, -0.4, -0.893, 1, 1, 1, root);
@@ -97,18 +117,34 @@ export class Cockpit {
     mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.05, 20), intA, 0, -0.02, 0, 1, 1, 1, this.wheel).rotation.x = Math.PI / 2;
 
     this.gearLever = this.addGearLever(root, intA, intB);
-    this.addCabin(root, intA, intB);
+    this.addCabin(cabin, intA, intB);
+    mergeStatic(cabin);
 
     root.add(this.roof);
-    mesh(BOX, intB, -0.35, 0.52, -0.82, 2.8, 0.07, 0.55, this.roof);
+    // Deep enough to cover the eye when it sits back from the wheel.
+    mesh(BOX, intB, -0.35, 0.52, -0.35, 2.8, 0.07, 1.5, this.roof);
     this.mirror = new Mirror(root, intB);
     this.screens.push(this.radio.face);
 
     this.dashLight.position.set(0, -0.36, -0.82);
     this.passLight.position.set(-0.2, 0.55, -0.5);
-    root.add(this.dashLight, this.passLight);
+    this.cabinLight.position.set(-0.35, 0.44, -0.35);
+    root.add(this.dashLight, this.passLight, this.cabinLight);
 
     this.pillars = this.addPillars(root, intB);
+    this.sideWindows = PILLAR_ENDS.map(([a, b, outward]) => {
+      const outer = outward * PILLAR_WIDTH / 2;
+      return {
+        object: root,
+        points: [
+          new THREE.Vector3(a.x + outer, SILL_Y, a.z),
+          new THREE.Vector3(b.x + outer, b.y + 0.1, b.z),
+          // Back beside the eye, which sees that far when sitting back.
+          new THREE.Vector3(b.x + outward * 3, b.y + 0.1, SIDE_WINDOW_END),
+          new THREE.Vector3(a.x + outward * 3, SILL_Y, SIDE_WINDOW_END)
+        ]
+      };
+    });
     hideFromReflection(root);
 
     const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -139,6 +175,10 @@ export class Cockpit {
     this.gaugeScreen.scale.set(scale * this.side, scale, 1);
   }
 
+  setCabinLight(on: boolean): void {
+    this.cabinLevel = on ? CABIN_LIGHT : 0;
+  }
+
   /** Mirroring the interior would otherwise turn the wheel the wrong way. */
   steer(bend: number): void {
     this.wheel.rotation.z = bend * 900 * this.side;
@@ -152,6 +192,7 @@ export class Cockpit {
 
   update(dt: number, speed: number, bend: number, clock: number): void {
     this.mirror.update(dt, speed, bend);
+    this.cabinLight.intensity = lerp(this.cabinLight.intensity, this.cabinLevel, damp(CABIN_FADE_RATE, dt));
     const power = lerp(this.power, this.engine === 'off' ? 0 : 1, damp(SCREEN_POWER_RATE, dt));
     if (power !== this.power) {
       this.power = power;
@@ -209,21 +250,21 @@ export class Cockpit {
   }
 
   /** Doors, floor, the console between the seats, and the passenger's side of the dash. */
-  private addCabin(root: THREE.Group, panel: THREE.Material, trim: THREE.Material): void {
+  private addCabin(cabin: THREE.Group, panel: THREE.Material, trim: THREE.Material): void {
     for (const x of [-1.3, 0.72]) {
-      mesh(BOX, panel, x, -0.76, -0.4, 0.08, 0.62, 2.2, root);
-      mesh(BOX, trim, x + Math.sign(x + 0.35) * -0.02, -0.44, -0.4, 0.12, 0.04, 2.2, root);
+      mesh(BOX, panel, x, -0.76, -0.4, 0.08, 0.62, 2.2, cabin);
+      mesh(BOX, trim, x + Math.sign(x + 0.35) * -0.02, -0.44, -0.4, 0.12, 0.04, 2.2, cabin);
     }
-    mesh(BOX, trim, -0.29, -1.06, -0.4, 2.05, 0.04, 2.2, root);
-    mesh(BOX, trim, -0.36, -0.82, -0.3, 0.22, 0.38, 1.1, root);
-    mesh(BOX, panel, -0.36, -0.62, 0.02, 0.2, 0.05, 0.36, root);
+    mesh(BOX, trim, -0.29, -1.06, -0.4, 2.05, 0.04, 2.2, cabin);
+    mesh(BOX, trim, -0.36, -0.82, -0.3, 0.22, 0.38, 1.1, cabin);
+    mesh(BOX, panel, -0.36, -0.62, 0.02, 0.2, 0.05, 0.36, cabin);
     // The passenger's side of the dash: a glovebox with its catch, and an air vent at the end.
     const lid = new THREE.MeshStandardMaterial({ color: 0x1e1f23, roughness: 0.7 });
     const chrome = new THREE.MeshStandardMaterial({ color: 0x8a8b90, roughness: 0.35, metalness: 0.8 });
-    mesh(BOX, lid, -0.86, -0.6, -0.944, 0.42, 0.15, 0.012, root);
-    mesh(BOX, chrome, -0.73, -0.56, -0.936, 0.07, 0.014, 0.01, root);
-    mesh(BOX, trim, -1.16, -0.53, -0.944, 0.16, 0.07, 0.012, root);
-    for (let i = 0; i < 3; i++) mesh(BOX, panel, -1.16, -0.552 + i * 0.022, -0.936, 0.15, 0.006, 0.006, root);
+    mesh(BOX, lid, -0.86, -0.6, -0.944, 0.42, 0.15, 0.012, cabin);
+    mesh(BOX, chrome, -0.73, -0.56, -0.936, 0.07, 0.014, 0.01, cabin);
+    mesh(BOX, trim, -1.16, -0.53, -0.944, 0.16, 0.07, 0.012, cabin);
+    for (let i = 0; i < 3; i++) mesh(BOX, panel, -1.16, -0.552 + i * 0.022, -0.936, 0.15, 0.006, 0.006, cabin);
   }
 
   /** Rod, rubber boot and knob, leaning back towards the driver from the console. */
@@ -242,11 +283,7 @@ export class Cockpit {
 
   /** The A-pillars, returning each one's outline plus everything beyond it, where the glass ends. */
   private addPillars(root: THREE.Group, material: THREE.Material): GlassOccluder[] {
-    const ends: [THREE.Vector3, THREE.Vector3, number][] = [
-      [new THREE.Vector3(-1.25, -0.47, -1.38), new THREE.Vector3(-0.98, 0.5, -0.78), -1],
-      [new THREE.Vector3(0.66, -0.47, -1.38), new THREE.Vector3(0.52, 0.5, -0.78), 1]
-    ];
-    return ends.map(([a, b, outward]) => {
+    return PILLAR_ENDS.map(([a, b, outward]) => {
       const pillar = new THREE.Mesh(BOX, material);
       pillar.scale.set(PILLAR_WIDTH, 0.08, a.distanceTo(b));
       pillar.position.copy(a).add(b).multiplyScalar(0.5);

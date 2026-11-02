@@ -76,17 +76,18 @@ engine.onChange(state => {
   if (state === 'running') showTipsOnce(settings);
 });
 const environment = new Environment(stage, lights, postfx, cockpit, backdrop, particles);
-const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera, cockpit.roof, cockpit.glassOccluders, route.lampTint);
-const applySeat = (): void => stage.setSeat(settings.value.seat);
-settings.onChange(applySeat);
-applySeat();
+const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera, cockpit.roof, cockpit.glassOccluders, cockpit.sideWindows, route.lampTint);
+settings.onChange(() => stage.setSeat(settings.value.seat));
+stage.setSeat(settings.value.seat, true);
 // The first visit picks a seat behind steamed-up glass, so the scenery is still a surprise.
 windshield.setMisted(!settings.value.seatPicked, true);
+cockpit.setCabinLight(!settings.value.seatPicked);
 const startScreen = createStartScreen(engine, {
   needed: !settings.value.seatPicked,
   done: () => {
     settings.update({ seat: stage.seatFor(), seatPicked: true });
     windshield.setMisted(false);
+    cockpit.setCabinLight(false);
   }
 });
 

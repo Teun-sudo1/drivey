@@ -133,11 +133,12 @@ export class Stage {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Where the driver sits; the framing eases there. */
-  setSeat(seat: SeatId): void {
-    if (seat === this.seat) return;
+  /** Where the driver sits; the framing eases there, or jumps there on startup. */
+  setSeat(seat: SeatId, snap = false): void {
+    if (seat === this.seat && !snap) return;
     this.seat = seat;
     this.settled = false;
+    if (snap) Object.assign(this.framing, this.targetFraming());
   }
 
   /** The seat as it applies on this screen. */
