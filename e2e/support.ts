@@ -14,15 +14,23 @@ export interface Rect {
   bottom: number;
 }
 
-/** Fails any test during which the page throws or logs an error. */
+const isLocal = (url: string): boolean => /^(https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]|blob:|data:)/.test(url);
+
+/**
+ * Fails any test during which the page throws or logs an error, and keeps
+ * every test off the real internet: music services are faked per test.
+ */
 export const test = base.extend<{ pageErrors: string[] }>({
   pageErrors: [
     async ({ page }, use) => {
       const errors: string[] = [];
+      await page.route(url => !isLocal(url.href), route => route.abort('internetdisconnected'));
       page.on('pageerror', e => errors.push(e.message));
       page.on('console', m => {
-        // The favicon arrives with the PWA icons in M5.
-        if (m.type() === 'error' && !/404/.test(m.text())) errors.push(m.text());
+        // The favicon arrives with the PWA icons in M5; failed outside requests are the faked network.
+        // Headless browsers have no sound card, which Chromium reports as an error.
+        if (/audio device or the WebAudio renderer/.test(m.text())) return;
+        if (m.type() === 'error' && !/404/.test(m.text()) && isLocal(m.location().url || 'http://localhost/')) errors.push(m.text());
       });
       await use(errors);
       expect(errors).toEqual([]);
@@ -30,6 +38,25 @@ export const test = base.extend<{ pageErrors: string[] }>({
     { auto: true }
   ]
 });
+
+/** A WAV of a soft tone, for faked music streams. */
+export function toneWav(seconds: number, hz = 330): Buffer {
+  const rate = 8000, samples = Math.round(rate * seconds), b = Buffer.alloc(44 + samples * 2);
+  b.write('RIFF', 0);
+  b.writeUInt32LE(36 + samples * 2, 4);
+  b.write('WAVEfmt ', 8);
+  b.writeUInt32LE(16, 16);
+  b.writeUInt16LE(1, 20);
+  b.writeUInt16LE(1, 22);
+  b.writeUInt32LE(rate, 24);
+  b.writeUInt32LE(rate * 2, 28);
+  b.writeUInt16LE(2, 32);
+  b.writeUInt16LE(16, 34);
+  b.write('data', 36);
+  b.writeUInt32LE(samples * 2, 40);
+  for (let i = 0; i < samples; i++) b.writeInt16LE(Math.round(Math.sin((2 * Math.PI * hz * i) / rate) * 3000), 44 + i * 2);
+  return b;
+}
 
 export { expect };
 

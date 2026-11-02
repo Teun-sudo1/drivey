@@ -1,0 +1,73 @@
+import type { AudioEngine } from './engine';
+import { filter, midiToHz } from './nodes';
+
+/** One-off sounds: the wiper blade, the phase chime and the key clicking between positions. */
+export class Effects {
+  constructor(private readonly audio: AudioEngine) {}
+
+  /** A blade sweeping across wet glass, ending in a soft thump as it turns. */
+  swish(): void {
+    const graph = this.audio.graph;
+    if (!graph) return;
+    const { ctx, channels, noise } = graph;
+    const t = ctx.currentTime;
+    const source = ctx.createBufferSource();
+    source.buffer = noise.white;
+    const band = filter(ctx, 'bandpass', 1400, 1.2), g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.5, t + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+    band.frequency.setValueAtTime(900, t);
+    band.frequency.linearRampToValueAtTime(1800, t + 0.35);
+    source.connect(band);
+    band.connect(g);
+    g.connect(channels.wipers);
+    source.start(t, Math.random());
+    source.stop(t + 0.5);
+    const thump = ctx.createOscillator(), tg = ctx.createGain();
+    thump.frequency.value = 70;
+    tg.gain.setValueAtTime(0.0001, t);
+    tg.gain.setValueAtTime(0.25, t + 0.38);
+    tg.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    thump.connect(tg);
+    tg.connect(channels.wipers);
+    thump.start(t + 0.38);
+    thump.stop(t + 0.55);
+  }
+
+  /** Three rising bell notes at the end of a phase. */
+  chime(): void {
+    const graph = this.audio.graph;
+    if (!graph) return;
+    const { ctx, master } = graph;
+    const t = ctx.currentTime;
+    [76, 83, 88].forEach((note, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(), at = t + i * 0.18;
+      o.type = 'sine';
+      o.frequency.value = midiToHz(note);
+      g.gain.setValueAtTime(0, at);
+      g.gain.linearRampToValueAtTime(0.18, at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, at + 2.2);
+      o.connect(g);
+      g.connect(master);
+      o.start(at);
+      o.stop(at + 2.3);
+    });
+  }
+
+  /** The key's detent clicking as it moves to another position. */
+  click(): void {
+    const graph = this.audio.graph;
+    if (!graph) return;
+    const { ctx, master, noise } = graph;
+    const t = ctx.currentTime;
+    const source = ctx.createBufferSource(), g = ctx.createGain();
+    source.buffer = noise.white;
+    g.gain.setValueAtTime(0.35, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+    source.connect(filter(ctx, 'highpass', 2500)).connect(g);
+    g.connect(master);
+    source.start(t, Math.random());
+    source.stop(t + 0.04);
+  }
+}

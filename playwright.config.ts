@@ -3,6 +3,9 @@ import { defineConfig } from '@playwright/test';
 const PORT = 4173;
 const softwareWebGl = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 
+/** A fake sound card: parallel test browsers fighting over the real one stall each other's audio clock. */
+const fakeAudio = ['--disable-audio-output'];
+
 export default defineConfig({
   testDir: 'e2e',
   // Software rendering is slow, and every open page competes for the same CPU.
@@ -27,6 +30,6 @@ export default defineConfig({
     { name: 'phone-portrait', use: { browserName: 'webkit', viewport: { width: 390, height: 844 }, hasTouch: true } },
     { name: 'phone-landscape', use: { browserName: 'webkit', viewport: { width: 844, height: 390 }, hasTouch: true } },
     { name: 'laptop-webkit', use: { browserName: 'webkit', viewport: { width: 1280, height: 800 } } },
-    { name: 'laptop-chromium', use: { browserName: 'chromium', channel: 'chromium', viewport: { width: 1280, height: 800 }, launchOptions: { args: process.env.CI ? softwareWebGl : [] } } }
+    { name: 'laptop-chromium', use: { browserName: 'chromium', channel: 'chromium', viewport: { width: 1280, height: 800 }, launchOptions: { args: [...(process.env.CI ? softwareWebGl : []), ...fakeAudio] } } }
   ]
 });

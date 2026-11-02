@@ -29,7 +29,7 @@
 
 <div id="panel" class="hidden" aria-label="Settings" inert>
   <div class="tabs">
-    <button data-tab="timer" class="on">Timer</button><button data-tab="scene">Scene</button>
+    <button data-tab="timer" class="on">Timer</button><button data-tab="scene">Scene</button><button data-tab="sound">Sound</button>
     <button class="x" id="btnClose" aria-label="Close settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="body">
@@ -42,7 +42,7 @@
       <h4>Behaviour</h4>
       <div class="tog" data-k="auto">Auto-start next phase</div>
       <div class="tog" data-k="breakSlow">Slow down during breaks</div>
-      <p class="note">Keys: Space start/pause · F fullscreen · H hide UI</p>
+      <p class="note">Keys: Space start/pause · M mute · F fullscreen · H hide UI</p>
     </section>
     <section id="tab-scene">
       <h4>Route</h4>
@@ -58,6 +58,45 @@
       <div class="tog" data-k="vignette">Vignette</div>
       <div class="tog" data-k="grain">Film grain</div>
       <div class="tog" data-k="reduced">Reduced motion</div>
+    </section>
+    <section id="tab-sound">
+      <h4>Music</h4>
+      <div class="seg" id="segStyle" aria-label="Music style"></div>
+      <div class="seg seg-small" id="segSource" aria-label="Music source"></div>
+      <div class="np" id="nowPlaying">
+        <div class="np-text">
+          <b id="npTitle">Music starts with the engine</b>
+          <span id="npArtist"></span>
+          <span id="npCredit"></span>
+        </div>
+        <div class="np-buttons">
+          <button class="icon small" id="btnMusic" aria-label="Play music"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+          <button class="icon small" id="btnNext" aria-label="Next track"><svg viewBox="0 0 24 24"><path d="M6 5l9 7-9 7zM18 5v14"/></svg></button>
+          <button class="icon small" id="btnLike" aria-label="Like this track" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></button>
+          <button class="icon small" id="btnNever" aria-label="Never play this again"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg></button>
+        </div>
+      </div>
+      <p class="note" id="musicNote" hidden></p>
+      <div class="tog" data-k="shuffle">Shuffle</div>
+      <h4>Mixer</h4>
+      <div class="mix" data-mix="music">Music</div>
+      <div class="mix" data-mix="rain">Rain on glass</div>
+      <div class="mix" data-mix="engine">Engine hum</div>
+      <div class="mix" data-mix="wipers">Wipers</div>
+      <div class="mix" data-mix="traffic">Traffic and city</div>
+      <div class="mix" data-mix="wind">Wind</div>
+      <div class="tog" data-k="follow">Ambience follows the scene</div>
+      <div class="tog" data-k="muted">Mute everything</div>
+      <h4>Mixer presets</h4>
+      <div class="seg" id="mixPresets" aria-label="Mixer presets"></div>
+      <form class="preset-save" id="presetForm">
+        <input class="txt" id="presetName" placeholder="Name this mix" maxlength="40" aria-label="Preset name">
+        <button class="btn" type="submit">Save</button>
+      </form>
+      <details class="credits" id="credits">
+        <summary>Credits for this session</summary>
+        <ol id="creditList"></ol>
+      </details>
     </section>
   </div>
 </div>

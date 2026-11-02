@@ -1,0 +1,76 @@
+import { noiseBuffer, type NoiseKind } from './nodes';
+
+export const CHANNELS = ['music', 'rain', 'engine', 'wipers', 'traffic', 'wind'] as const;
+export type Channel = (typeof CHANNELS)[number];
+export type Mix = Record<Channel, number>;
+
+/** How quickly a level change is eased in, in seconds. */
+const LEVEL_EASE = 0.4;
+
+export interface AudioGraph {
+  readonly ctx: AudioContext;
+  /** Everything ends up here; muting closes it. */
+  readonly master: GainNode;
+  readonly channels: Record<Channel, GainNode>;
+  readonly noise: Record<NoiseKind, AudioBuffer>;
+}
+
+/**
+ * Owns the AudioContext. Browsers only allow sound after a user gesture, so
+ * nothing exists until `unlock` is called from one; listeners then build their
+ * part of the graph.
+ */
+export class AudioEngine {
+  graph: AudioGraph | null = null;
+  private muted = false;
+  private readonly readyListeners: ((graph: AudioGraph) => void)[] = [];
+
+  get isMuted(): boolean {
+    return this.muted;
+  }
+
+  /** Must run inside a user gesture handler, which is what lets the context start. */
+  unlock(): void {
+    if (this.graph) {
+      if (this.graph.ctx.state === 'suspended') void this.graph.ctx.resume();
+      return;
+    }
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    void ctx.resume();
+    const master = ctx.createGain();
+    master.gain.value = this.muted ? 0 : 0.9;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -14;
+    comp.ratio.value = 3;
+    master.connect(comp);
+    comp.connect(ctx.destination);
+    const channels = Object.fromEntries(CHANNELS.map(name => {
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      g.connect(master);
+      return [name, g];
+    })) as Record<Channel, GainNode>;
+    const noise = { white: noiseBuffer(ctx, 'white'), brown: noiseBuffer(ctx, 'brown'), crackle: noiseBuffer(ctx, 'crackle') };
+    this.graph = { ctx, master, channels, noise };
+    for (const listener of this.readyListeners) listener(this.graph);
+  }
+
+  /** Runs once the graph exists, straight away if it already does. */
+  onReady(listener: (graph: AudioGraph) => void): void {
+    if (this.graph) listener(this.graph);
+    else this.readyListeners.push(listener);
+  }
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (this.graph) this.graph.master.gain.setTargetAtTime(muted ? 0 : 0.9, this.graph.ctx.currentTime, 0.05);
+  }
+
+  /** Eases a channel towards a level. */
+  setLevel(channel: Channel, level: number): void {
+    if (!this.graph) return;
+    this.graph.channels[channel].gain.setTargetAtTime(level, this.graph.ctx.currentTime, LEVEL_EASE);
+  }
+}

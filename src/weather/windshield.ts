@@ -22,6 +22,8 @@ export interface WindshieldFrame {
 /** The glass layer. Canvas today; a shader version would only need to implement this. */
 export interface Windshield {
   update(frame: WindshieldFrame): void;
+  /** Called as a blade sets off across the glass, and again as it turns back. */
+  onStroke(listener: () => void): void;
   /** Paints the glass as it now is; separate from update so a frame is drawn once, however many steps it took. */
   draw(): void;
   /** The streetlight colour drops pick up, which differs by route. */
@@ -118,6 +120,7 @@ class CanvasWindshield implements Windshield {
   private wiperMotion = 0;
   private wetGlass = false;
   private mirrored = false;
+  private readonly strokeListeners: (() => void)[] = [];
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -129,6 +132,10 @@ class CanvasWindshield implements Windshield {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas is not available');
     this.ctx = ctx;
+  }
+
+  onStroke(listener: () => void): void {
+    this.strokeListeners.push(listener);
   }
 
   setLampTint(tint: LampTint): void {
@@ -238,7 +245,9 @@ class CanvasWindshield implements Windshield {
     if (this.wiperWait > 0) {
       this.wiperWait -= dt;
     } else {
+      const before = this.wiperPhase;
       this.wiperPhase += dt / this.wiperPeriod;
+      if (before === 0 || (before < 0.5 && this.wiperPhase >= 0.5)) for (const listener of this.strokeListeners) listener();
       if (this.wiperPhase >= 1) {
         this.wiperPhase = 0;
         this.wiperWait = w.wipePause;

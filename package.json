@@ -10,7 +10,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "build:e2e": "vite build --mode e2e --outDir dist-e2e"
+    "build:e2e": "vite build --mode e2e --outDir dist-e2e",
+    "music:manifest": "node scripts/music-manifest.mjs",
+    "predev": "node scripts/music-manifest.mjs",
+    "prebuild": "node scripts/music-manifest.mjs",
+    "prebuild:e2e": "node scripts/music-manifest.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "5.3.0",

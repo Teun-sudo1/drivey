@@ -1,9 +1,20 @@
+import { CHANNELS, type Mix } from '../audio/engine';
 import { clamp } from '../lib/math';
+import { SOURCE_MODES, type SourceMode } from '../music/player';
+import { STYLES, STYLE_IDS, type StyleId } from '../music/styles';
 import type { KeyValueStorage } from '../platform/types';
 import { ROUTES, type RouteId } from '../routes';
 import { TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from '../weather/tables';
 
 export type DriveSide = 'left' | 'right';
+
+export interface MixerPreset {
+  name: string;
+  mix: Mix;
+}
+
+export const MAX_PRESETS = 12;
+export const MAX_PRESET_NAME = 40;
 
 export interface Settings {
   route: RouteId;
@@ -20,10 +31,21 @@ export interface Settings {
   every: number;
   auto: boolean;
   breakSlow: boolean;
+  style: StyleId;
+  /** Where each style's music comes from. */
+  sources: Record<StyleId, SourceMode>;
+  mix: Mix;
+  /** Whether the weather and road shape the ambient levels. */
+  follow: boolean;
+  muted: boolean;
+  /** Whether music plays once the engine is running. */
+  musicOn: boolean;
+  shuffle: boolean;
+  mixerPresets: MixerPreset[];
 }
 
 export type DurationKey = 'focus' | 'short' | 'long' | 'every';
-export type ToggleKey = 'bloom' | 'vignette' | 'grain' | 'reduced' | 'auto' | 'breakSlow';
+export type ToggleKey = 'bloom' | 'vignette' | 'grain' | 'reduced' | 'auto' | 'breakSlow' | 'follow' | 'shuffle' | 'muted';
 
 /** min, max, step */
 export const DURATION_LIMITS: Record<DurationKey, readonly [number, number, number]> = {
@@ -50,8 +72,30 @@ function defaults(): Settings {
     long: 15,
     every: 4,
     auto: false,
-    breakSlow: true
+    breakSlow: true,
+    style: 'chillhop',
+    sources: Object.fromEntries(STYLE_IDS.map(id => [id, 'mix'])) as Record<StyleId, SourceMode>,
+    mix: defaultMix(),
+    follow: true,
+    muted: false,
+    musicOn: true,
+    shuffle: true,
+    mixerPresets: []
   };
+}
+
+export function defaultMix(): Mix {
+  return { music: 0.55, rain: 0.55, engine: 0.35, wipers: 0.5, traffic: 0.3, wind: 0.2 };
+}
+
+function sanitizeMix(raw: unknown): Mix | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const mix = defaultMix();
+  for (const k of CHANNELS) {
+    const v = (raw as Record<string, unknown>)[k];
+    if (typeof v === 'number' && Number.isFinite(v)) mix[k] = clamp(v, 0, 1);
+  }
+  return mix;
 }
 
 /** Keeps only stored values that are still valid, so a stale or edited blob can't break startup. */
@@ -64,7 +108,22 @@ function sanitize(stored: unknown): Settings {
   if (raw.driveSide === 'left' || raw.driveSide === 'right') s.driveSide = raw.driveSide;
   if (isKeyOf(TIMES_OF_DAY, raw.tod)) s.tod = raw.tod;
   if (isKeyOf(WEATHERS, raw.weather)) s.weather = raw.weather;
-  for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow'] as const) {
+  if (isKeyOf(STYLES, raw.style)) s.style = raw.style;
+  if (typeof raw.sources === 'object' && raw.sources !== null) {
+    for (const id of STYLE_IDS) {
+      const mode = (raw.sources as Record<string, unknown>)[id];
+      if (isKeyOf(SOURCE_MODES, mode)) s.sources[id] = mode;
+    }
+  }
+  s.mix = sanitizeMix(raw.mix) ?? s.mix;
+  if (Array.isArray(raw.mixerPresets)) {
+    s.mixerPresets = raw.mixerPresets.flatMap((p: unknown) => {
+      const preset = p as Partial<MixerPreset> | null;
+      const mix = sanitizeMix(preset?.mix);
+      return typeof preset?.name === 'string' && preset.name.trim() && mix ? [{ name: preset.name.trim().slice(0, MAX_PRESET_NAME), mix }] : [];
+    }).slice(0, MAX_PRESETS);
+  }
+  for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow', 'follow', 'muted', 'musicOn', 'shuffle'] as const) {
     const v = raw[k];
     if (typeof v === 'boolean') s[k] = v;
   }

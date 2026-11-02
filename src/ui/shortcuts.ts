@@ -1,5 +1,6 @@
 export interface ShortcutActions {
   togglePlay(): void;
+  toggleMute(): void;
   toggleFullscreen(): void;
   toggleHidden(): void;
 }
@@ -23,6 +24,8 @@ export function bindShortcuts(actions: ShortcutActions): void {
       actions.togglePlay();
     } else if (e.key.toLowerCase() === 'f') {
       void actions.toggleFullscreen();
+    } else if (e.key.toLowerCase() === 'm') {
+      actions.toggleMute();
     } else if (e.key.toLowerCase() === 'h') {
       actions.toggleHidden();
     }
