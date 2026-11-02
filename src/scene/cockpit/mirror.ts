@@ -16,6 +16,18 @@ const DASH_SPACING = 10, DASH_COUNT = 8;
 /** Projection scale from metres behind the car to canvas pixels. */
 const FOCAL = 60;
 const HORIZON_Y = 42;
+/**
+ * The driver sees the mirror from one side, so the rear window is seen at an
+ * angle: its near side looms larger and the road's vanishing point slides the
+ * other way. Drawn for a driver on the right; the cockpit's own mirroring
+ * flips it for the other side.
+ */
+const VIEW_SHIFT = -14;
+const REAR_WINDOW: readonly (readonly [number, number])[] = [[14, 12], [CANVAS_W - 14, 5], [CANVAS_W - 14, 82], [14, 76]];
+const HEADRESTS = [
+  { x: 76, base: 73, scale: 0.86 },
+  { x: 248, base: 78, scale: 1.08 }
+];
 
 const TEAL = '159,255,224', SODIUM = '255,180,107';
 const ROAD_DRY = new THREE.Color(0x25262c);
@@ -149,7 +161,7 @@ export class Mirror {
   private draw(bend: number): void {
     const g = this.ctx, w = CANVAS_W, h = CANVAS_H;
     // The road behind curves the same way as the one ahead, mirrored by being viewed backwards.
-    const vx = w / 2 - bend * 40000;
+    const vx = w / 2 + VIEW_SHIFT - bend * 40000;
 
     const sky = g.createLinearGradient(0, 0, 0, HORIZON_Y);
     sky.addColorStop(0, '#' + this.skyTop.getHexString());
@@ -189,14 +201,9 @@ export class Mirror {
     g.fillStyle = '#050608';
     g.beginPath();
     g.rect(0, 0, w, h);
-    g.roundRect(14, 7, w - 28, h - 19, 14);
+    this.traceRearWindow();
     g.fill('evenodd');
-    g.fillStyle = '#23252c';
-    for (const x of [38, 222]) {
-      g.beginPath();
-      g.roundRect(x, 58, 60, 40, 12);
-      g.fill();
-    }
+    for (const rest of HEADRESTS) this.headrest(rest.x, rest.base, rest.scale);
 
     const sheen = g.createLinearGradient(0, 0, w, h);
     sheen.addColorStop(0.3, 'rgba(255,255,255,0)');
@@ -213,6 +220,52 @@ export class Mirror {
     g.stroke();
   }
 
+  /** The rear window as a rounded quadrilateral, taller on the side nearer the driver. */
+  private traceRearWindow(): void {
+    const g = this.ctx, n = REAR_WINDOW.length;
+    const [lx, ly] = REAR_WINDOW[n - 1], [fx, fy] = REAR_WINDOW[0];
+    g.moveTo((lx + fx) / 2, (ly + fy) / 2);
+    for (let i = 0; i < n; i++) {
+      const [cx, cy] = REAR_WINDOW[i], [nx, ny] = REAR_WINDOW[(i + 1) % n];
+      g.arcTo(cx, cy, nx, ny, 14);
+    }
+    g.closePath();
+  }
+
+  /** A padded cushion on two posts above the top of the seatback, which starts at base. */
+  private headrest(x: number, base: number, scale: number): void {
+    const g = this.ctx;
+    g.save();
+    g.translate(x, base);
+    g.scale(scale, scale);
+    g.fillStyle = '#5a5e6a';
+    g.fillRect(-17, -10, 4, 12);
+    g.fillRect(13, -10, 4, 12);
+
+    g.fillStyle = '#2a2c33';
+    g.beginPath();
+    g.roundRect(-46, 0, 92, (CANVAS_H - base) / scale + 4, [18, 18, 0, 0]);
+    g.fill();
+
+    const cushion = g.createLinearGradient(0, -38, 0, -8);
+    cushion.addColorStop(0, '#565a66');
+    cushion.addColorStop(1, '#2c2e36');
+    g.fillStyle = cushion;
+    g.strokeStyle = 'rgba(190,198,212,.5)';
+    g.lineWidth = 1.5;
+    g.beginPath();
+    g.roundRect(-34, -38, 68, 30, [16, 16, 8, 8]);
+    g.fill();
+    g.stroke();
+    // A seam across the padding.
+    g.strokeStyle = 'rgba(0,0,0,.35)';
+    g.beginPath();
+    g.moveTo(-28, -22);
+    g.lineTo(28, -22);
+    g.stroke();
+    g.restore();
+  }
+
   private drawWeather(): void {
     const g = this.ctx, w = CANVAS_W, h = CANVAS_H;
     if (this.fogVeil > 0.01) {
@@ -227,7 +280,7 @@ export class Mirror {
         const x = Math.random() * w, y = Math.random() * h;
         // Rain seen from the rear window streaks in towards the road's vanishing point.
         g.moveTo(x, y);
-        g.lineTo(x + (w / 2 - x) * 0.05, y + 6);
+        g.lineTo(x + (w / 2 + VIEW_SHIFT - x) * 0.05, y + 6);
       }
       g.stroke();
     }
