@@ -89,7 +89,7 @@ test.describe('driving side', () => {
       hasLabels: pool.chunks.some((c: any) => c.labels.length > 0),
       interiorScale: cockpit.root.scale.x,
       screensReadable: cockpit.screens.every((s: any) => s.matrixWorld.determinant() > 0),
-      lane: roadSurface.laneCentres.value.x,
+      lane: roadSurface.lanes.value.x,
       mirrored: windshield.mirrored
     };
   });

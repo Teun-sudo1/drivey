@@ -46,9 +46,10 @@ function buildChunk(chunk: Chunk, i: number): void {
 export const city: RouteDefinition = {
   name: 'City expressway',
   lampTint: 'teal',
-  lanes: [-0.4, 3.2],
   speed: 22,
   maxBend: 0.00025,
-  groundY: -14,
+  traffic: { ahead: [-0.4, 3.2], oncoming: [], aheadCount: 6, oncomingCount: 0 },
+  scenery: { skyline: 'city', groundY: -14, ground: 'dark', sea: false },
+  mirrorLamps: { spacing: 20, colors: [LAMP_TEAL, LAMP_SODIUM] },
   buildChunk
 };

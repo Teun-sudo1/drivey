@@ -136,6 +136,8 @@ export async function mirrorInnerRect(page: Page): Promise<Rect> {
 /** How many pixels on the windshield layer are drawn in the given area, or all of it. */
 export async function glassPixels(page: Page, rect?: Rect): Promise<number> {
   return page.evaluate(r => {
+    // Simulated steps don't paint the glass; frames do.
+    window.__drivey.windshield.draw();
     const canvas = document.querySelector<HTMLCanvasElement>('#glass')!;
     const scale = canvas.width / canvas.clientWidth;
     const x = Math.max(0, Math.floor((r?.left ?? 0) * scale)), y = Math.max(0, Math.floor((r?.top ?? 0) * scale));

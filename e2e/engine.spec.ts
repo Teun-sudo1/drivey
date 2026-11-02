@@ -49,7 +49,7 @@ test.describe('parked on the start screen', () => {
     await expect(page.locator('#startTod button:has-text("Dusk")')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#startWeather button:has-text("Fog")')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#startSide button:has-text("Right")')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('#startRoute button')).toHaveText(['City expressway']);
+    await expect(page.locator('#startRoute button')).toHaveText(['City expressway', 'Coastal road', 'Highway', 'Countryside']);
 
     // Nothing may need scrolling, including on a phone on its side.
     await expect(page.locator('#btnGetIn')).toBeInViewport({ ratio: 1 });

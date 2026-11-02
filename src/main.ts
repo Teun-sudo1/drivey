@@ -12,13 +12,14 @@ import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type 
 import { getPlatform } from './platform';
 import { ROUTES, type RouteId } from './routes';
 import { Backdrop } from './scene/backdrop';
-import { ChunkPool } from './scene/chunkPool';
+import { ChunkPool, shelterAt } from './scene/chunkPool';
 import { Cockpit } from './scene/cockpit/cockpit';
 import { Drive } from './scene/drive';
 import { createLights, setLightsSide } from './scene/lights';
 import { PostFx } from './scene/postfx';
 import { RoadSurface } from './scene/roadSurface';
 import { Stage } from './scene/stage';
+import { Traffic } from './traffic/traffic';
 import { startTimerDriver } from './timer/driver';
 import { Pomodoro } from './timer/pomodoro';
 import { createControlSurface } from './ui/controlSurface';
@@ -43,16 +44,18 @@ const platform = getPlatform();
 const settings = await SettingsStore.load(platform.storage);
 
 /* Scene */
-const route = ROUTES[settings.value.route];
+let route = ROUTES[settings.value.route];
 const engine = new Engine();
 const stage = new Stage($<HTMLCanvasElement>('#gl'));
 const postfx = new PostFx(stage);
 const lights = createLights(stage.scene);
 const cockpit = new Cockpit(stage.camera, route.name);
 const backdrop = new Backdrop(stage.scene, route);
-const roadSurface = new RoadSurface(stage, route.lanes);
+const roadSurface = new RoadSurface(stage, route);
 const pool = new ChunkPool(stage.scene, route);
 const drive = new Drive(stage, pool, backdrop, cockpit, route);
+const traffic = new Traffic(stage.scene, route);
+cockpit.mirror.setLamps(route.mirrorLamps);
 const particles = new Particles(stage.scene, matchMedia('(pointer: coarse)').matches ? MOBILE_PARTICLES : DESKTOP_PARTICLES);
 engine.onChange(state => cockpit.setEngine(state));
 const startScreen = createStartScreen(engine);
@@ -71,7 +74,7 @@ timer.onPhaseEnd(({ next }) => {
 const hud = createHud(
   timer,
   () => settings.value.every,
-  () => `${route.name} · ${TIMES_OF_DAY[settings.value.tod].name} · ${WEATHERS[settings.value.weather].name}`,
+  () => `${ROUTES[settings.value.route].name} · ${TIMES_OF_DAY[settings.value.tod].name} · ${WEATHERS[settings.value.weather].name}`,
   (txt, label) => cockpit.showTime(txt, label)
 );
 const surface = createControlSurface(() => idle.wake());
@@ -95,7 +98,7 @@ bindShortcuts({
 const options = <T extends string>(table: Record<T, { name: string }>) => (Object.keys(table) as T[]).map(k => [k, table[k].name] as const);
 // The same controls appear on the start screen and in settings, so changes refresh both.
 const sceneControls = [
-  mountSegmented<RouteId>($('#startRoute'), options(ROUTES), () => settings.value.route, route => settings.update({ route })),
+  ...[$('#segRoute'), $('#startRoute')].map(el => mountSegmented<RouteId>(el, options(ROUTES), () => settings.value.route, route => settings.update({ route }))),
   ...[$('#segSide'), $('#startSide')].map(el => mountSegmented<DriveSide>(el, [['left', 'Left'], ['right', 'Right']], () => settings.value.driveSide, driveSide => settings.update({ driveSide }))),
   ...[$('#segTod'), $('#startTod')].map(el => mountSegmented<TimeOfDayId>(el, options(TIMES_OF_DAY), () => settings.value.tod, tod => settings.update({ tod }))),
   ...[$('#segWeather'), $('#startWeather')].map(el => mountSegmented<WeatherId>(el, options(WEATHERS), () => settings.value.weather, weather => settings.update({ weather })))
@@ -126,9 +129,28 @@ function applyBodyFlags(): void {
 settings.onChange(applyBodyFlags);
 applyBodyFlags();
 
+/** Swaps the road, scenery and traffic for another route, without stopping the car. */
+function applyRoute(): void {
+  const next = ROUTES[settings.value.route];
+  if (next === route) return;
+  route = next;
+  pool.setRoute(route);
+  backdrop.setRoute(route);
+  traffic.setRoute(route);
+  drive.setRoute(route);
+  roadSurface.setRoute(route);
+  windshield.setLampTint(route.lampTint);
+  cockpit.setRouteName(route.name);
+  cockpit.mirror.setLamps(route.mirrorLamps);
+  environment.refresh();
+}
+settings.onChange(applyRoute);
+
 function applyDriveSide(): void {
   const side = settings.value.driveSide === 'right' ? -1 : 1;
   pool.setSide(side);
+  backdrop.setSide(side);
+  traffic.setSide(side);
   cockpit.setSide(side);
   roadSurface.setSide(side);
   setLightsSide(lights, side);
@@ -148,19 +170,25 @@ function simulate(dt: number): void {
   const ignitionOn = engine.state === 'on' || engine.state === 'running';
   environment.update(dt, s.tod, s.weather, ignitionOn);
   drive.update(dt, engine.state, s.breakSlow && timer.phase !== 'focus', s.reduced, environment.lampLevel);
+  traffic.update(dt, drive.speed, environment.headlightLevel);
   cockpit.update(dt, drive.speed, drive.bend, drive.clock);
-  particles.update({ dt, speed: drive.speed, clock: drive.clock, rain: environment.rainLevel, snow: environment.snowLevel, reducedMotion: s.reduced });
-  windshield.update({ dt, speed: drive.speed, weather: WEATHERS[s.weather], lamp: environment.lampLevel, wipersOn: ignitionOn, mirrored: s.driveSide === 'right' });
+  const shelters = pool.shelters();
+  // Nothing falls inside a tunnel; the camera sits at z = 0.
+  const open = 1 - shelterAt(shelters, 0);
+  particles.update({ dt, speed: drive.speed, clock: drive.clock, rain: environment.rainLevel * open, snow: environment.snowLevel * open, reducedMotion: s.reduced });
+  windshield.update({ dt, speed: drive.speed, weather: WEATHERS[s.weather], lamp: environment.lampLevel, wipersOn: ignitionOn, mirrored: s.driveSide === 'right', shelter: 1 - open });
   roadSurface.setLevels(environment.wetLevel, environment.snowLevel, environment.headlightLevel);
+  roadSurface.setShelters(shelters);
 }
 
 startLoop(dt => {
   simulate(dt);
+  windshield.draw();
   roadSurface.render();
   postfx.render(settings.value.bloom);
 });
 
 // Lets the browser tests read scene state. Compiled out of the public build.
 if (import.meta.env.MODE === 'e2e') {
-  Object.assign(window, { __drivey: { simulate, engine, startScreen, stage, postfx, pool, cockpit, drive, environment, particles, windshield, roadSurface, timer, settings } });
+  Object.assign(window, { __drivey: { simulate, engine, startScreen, stage, postfx, pool, backdrop, traffic, cockpit, drive, environment, particles, windshield, roadSurface, timer, settings } });
 }

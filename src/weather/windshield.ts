@@ -15,11 +15,17 @@ export interface WindshieldFrame {
   wipersOn: boolean;
   /** Mirrors the wipers for a left-hand-drive car. */
   mirrored: boolean;
+  /** 0 in the open to 1 in a tunnel, where nothing new lands on the glass. */
+  shelter: number;
 }
 
 /** The glass layer. Canvas today; a shader version would only need to implement this. */
 export interface Windshield {
   update(frame: WindshieldFrame): void;
+  /** Paints the glass as it now is; separate from update so a frame is drawn once, however many steps it took. */
+  draw(): void;
+  /** The streetlight colour drops pick up, which differs by route. */
+  setLampTint(tint: LampTint): void;
 }
 
 interface Drop {
@@ -118,22 +124,25 @@ class CanvasWindshield implements Windshield {
     private readonly camera: THREE.Camera,
     private readonly roof: THREE.Object3D,
     private readonly occluders: readonly GlassOccluder[],
-    private readonly lampTint: LampTint
+    private lampTint: LampTint
   ) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas is not available');
     this.ctx = ctx;
   }
 
-  update({ dt, speed, weather, lamp, wipersOn, mirrored }: WindshieldFrame): void {
+  setLampTint(tint: LampTint): void {
+    this.lampTint = tint;
+  }
+
+  update({ dt, speed, weather, lamp, wipersOn, mirrored, shelter }: WindshieldFrame): void {
     this.mirrored = mirrored;
     this.syncSize();
     this.measureGlass();
-    this.spawn(dt, weather, lamp);
+    this.spawn(dt * (1 - shelter), weather, lamp);
     this.age(dt, speed, weather);
     this.moveWipers(dt, weather, wipersOn);
     this.veil = lerp(this.veil, weather.veil, damp(VEIL_RATE, dt));
-    this.draw();
   }
 
   private syncSize(): void {
@@ -257,7 +266,7 @@ class CanvasWindshield implements Windshield {
     });
   }
 
-  private draw(): void {
+  draw(): void {
     const g = this.ctx;
     g.clearRect(0, 0, this.width, this.height);
     g.save();

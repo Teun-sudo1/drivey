@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { lerp } from '../lib/math';
+import { laneCentres, type RouteDefinition } from '../routes/types';
+import type { Shelter } from './chunkPool';
 import { MATERIALS, LAMP_KINDS } from './materials';
 import { INTERIOR_LAYER, type Stage } from './stage';
 import { TILING_NOISE } from './textures';
@@ -12,11 +14,16 @@ const MIN_WET = 0.03;
 /** Snow is dimmer under headlights, whose tuning for dark asphalt would otherwise blow it out to white. */
 const SNOW_ALBEDO_DAY = 0.68;
 const SNOW_ALBEDO_HEADLIGHTS = 0.1;
+/** The shader has room for this many lanes and tunnels. */
+const MAX_LANES = 4;
+const MAX_SHELTERS = 2;
+/** Stands in for a missing tunnel: a stretch of road far behind the car. */
+const NO_SHELTER = 1e5;
 
 const VERTEX_HEADER = `
 uniform mat4 uReflectionMatrix;
 varying vec4 vReflection;
-varying vec2 vRoad;
+varying vec3 vRoad;
 `;
 
 const FRAGMENT_HEADER = `
@@ -25,9 +32,18 @@ uniform sampler2D tRoadNoise;
 uniform float uWet;
 uniform float uSnow;
 uniform float uSnowAlbedo;
-uniform vec2 uLanes;
+uniform vec4 uLanes;
+uniform vec4 uShelters;
 varying vec4 vReflection;
-varying vec2 vRoad;
+varying vec3 vRoad;
+
+float laneRut(float x, float lane) {
+  return abs(abs(x - lane) - 0.75);
+}
+
+float covered(float z, vec2 tunnel) {
+  return clamp((tunnel.x - z) / 4.0, 0.0, 1.0) * clamp((z - tunnel.y) / 4.0, 0.0, 1.0);
+}
 `;
 
 /* Runs early in main(), so the masks are in scope for the later chunks. The
@@ -38,13 +54,15 @@ float roadNoise = texture2D(tRoadNoise, roadUv).r;
 float roadDetail = texture2D(tRoadNoise, roadUv * 7.0).r;
 
 float rutDistance = min(
-  abs(abs(vRoad.x - uLanes.x) - 0.75),
-  abs(abs(vRoad.x - uLanes.y) - 0.75)
+  min(laneRut(vRoad.x, uLanes.x), laneRut(vRoad.x, uLanes.y)),
+  min(laneRut(vRoad.x, uLanes.z), laneRut(vRoad.x, uLanes.w))
 ) + (roadDetail - 0.5) * 0.25;
 float rut = 1.0 - smoothstep(0.12, 0.45, rutDistance);
-float snowMask = smoothstep(0.2, 0.5, uSnow * (1.1 - rut * 0.85) + (roadNoise - 0.5) * 0.35);
+// Inside a tunnel the road stays clear of snow, and only damp from what cars carry in.
+float sheltered = max(covered(vRoad.z, uShelters.xy), covered(vRoad.z, uShelters.zw));
+float snowMask = smoothstep(0.2, 0.5, uSnow * (1.1 - rut * 0.85) + (roadNoise - 0.5) * 0.35) * (1.0 - sheltered);
 
-float wetMask = smoothstep(roadNoise - 0.15, roadNoise + 0.15, uWet * 1.1) * (1.0 - snowMask);
+float wetMask = smoothstep(roadNoise - 0.15, roadNoise + 0.15, uWet * 1.1 * (1.0 - sheltered * 0.8)) * (1.0 - snowMask);
 diffuseColor.rgb *= mix(1.0, 0.55, wetMask);
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.96, 1.0) * uSnowAlbedo, snowMask);
 `;
@@ -88,7 +106,10 @@ export class RoadSurface {
   private readonly reflectionMatrix = new THREE.Matrix4();
   private readonly wet = { value: 0 };
   private readonly snow = { value: 0 };
-  private readonly laneCentres = { value: new THREE.Vector2() };
+  private readonly lanes = { value: new THREE.Vector4() };
+  private readonly shelters = { value: new THREE.Vector4(NO_SHELTER, NO_SHELTER, NO_SHELTER, NO_SHELTER) };
+  private routeLanes: number[];
+  private side = 1;
   private readonly snowAlbedo = { value: SNOW_ALBEDO_DAY };
   private renderThisFrame = true;
 
@@ -100,7 +121,8 @@ export class RoadSurface {
   private readonly clip = new THREE.Vector4();
   private readonly q = new THREE.Vector4();
 
-  constructor(private readonly stage: Stage, private readonly lanes: readonly [number, number]) {
+  constructor(private readonly stage: Stage, route: RouteDefinition) {
+    this.routeLanes = laneCentres(route);
     const road = MATERIALS.road;
     road.onBeforeCompile = sh => {
       sh.uniforms.uReflectionMatrix = { value: this.reflectionMatrix };
@@ -109,10 +131,11 @@ export class RoadSurface {
       sh.uniforms.uWet = this.wet;
       sh.uniforms.uSnow = this.snow;
       sh.uniforms.uSnowAlbedo = this.snowAlbedo;
-      sh.uniforms.uLanes = this.laneCentres;
+      sh.uniforms.uLanes = this.lanes;
+      sh.uniforms.uShelters = this.shelters;
       sh.vertexShader = VERTEX_HEADER + sh.vertexShader.replace(
         'gl_Position = projectionMatrix * mvPosition;',
-        'gl_Position = projectionMatrix * mvPosition;\nvReflection = uReflectionMatrix * bw;\nvRoad = vec2((modelMatrix * vec4(transformed, 1.0)).x, uv.y);'
+        'gl_Position = projectionMatrix * mvPosition;\nvReflection = uReflectionMatrix * bw;\nvRoad = vec3((modelMatrix * vec4(transformed, 1.0)).x, uv.y, bw.z);'
       );
       sh.fragmentShader = FRAGMENT_HEADER + sh.fragmentShader
         .replace('#include <color_fragment>', '#include <color_fragment>\n' + SURFACE_GLSL)
@@ -128,8 +151,26 @@ export class RoadSurface {
     });
   }
 
+  setRoute(route: RouteDefinition): void {
+    this.routeLanes = laneCentres(route);
+    this.setSide(this.side);
+  }
+
   setSide(side: number): void {
-    this.laneCentres.value.set(this.lanes[0] * side, this.lanes[1] * side);
+    this.side = side;
+    // Unused slots repeat the first lane, which leaves the ruts unchanged.
+    const lanes = Array.from({ length: MAX_LANES }, (_, i) => (this.routeLanes[i] ?? this.routeLanes[0]) * side);
+    this.lanes.value.fromArray(lanes);
+  }
+
+  /** The tunnels on the road, nearest first, where it stays dry and clear of snow. */
+  setShelters(shelters: readonly Shelter[]): void {
+    const v = this.shelters.value;
+    for (let i = 0; i < MAX_SHELTERS; i++) {
+      const s = shelters[i];
+      v.setComponent(i * 2, s ? s.near : NO_SHELTER);
+      v.setComponent(i * 2 + 1, s ? s.far : NO_SHELTER);
+    }
   }
 
   /** Renders the reflection every other frame; a slight lag doesn't show in a blurred, wet road. */

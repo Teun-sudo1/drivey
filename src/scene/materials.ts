@@ -7,7 +7,18 @@ export const MATERIALS = {
   concrete: new THREE.MeshStandardMaterial({ color: 0x5a5b61, roughness: 0.95 }),
   metal: new THREE.MeshStandardMaterial({ color: 0x8a8f98, roughness: 0.45, metalness: 0.6 }),
   dark: new THREE.MeshStandardMaterial({ color: 0x1b1d22, roughness: 0.9 }),
-  under: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd9a0).multiplyScalar(1.2) })
+  under: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd9a0).multiplyScalar(1.2) }),
+  rock: new THREE.MeshStandardMaterial({ color: 0x3a342e, roughness: 1, flatShading: true }),
+  grass: new THREE.MeshStandardMaterial({ color: 0x2c3d25, roughness: 1 }),
+  tree: new THREE.MeshStandardMaterial({ color: 0x1f3320, roughness: 1, flatShading: true }),
+  trunk: new THREE.MeshStandardMaterial({ color: 0x3a2a1e, roughness: 1 }),
+  house: new THREE.MeshStandardMaterial({ color: 0x6d6258, roughness: 0.9 }),
+  roof: new THREE.MeshStandardMaterial({ color: 0x3b2622, roughness: 0.9, flatShading: true }),
+  warmWindow: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc27a).multiplyScalar(2) }),
+  reflector: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff5030).multiplyScalar(1.5) }),
+  tunnelWall: new THREE.MeshStandardMaterial({ color: 0x4a4c50, roughness: 0.8 }),
+  /** Tunnel lights burn day and night. */
+  tunnelLight: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc56e).multiplyScalar(2.4) })
 };
 
 export const WINDOW_MATERIALS = [0.22, 0.38, 0.55].map(

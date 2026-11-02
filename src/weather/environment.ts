@@ -45,12 +45,20 @@ const LINE_DRY = new THREE.Color(0xd8d8d0);
 const CONCRETE_DRY = new THREE.Color(0x5a5b61);
 const DARK_DRY = new THREE.Color(0x1b1d22);
 const SNOW_COVER = new THREE.Color(0xaab2bf);
+/** Natural surfaces and how fully snow covers each. */
+const SNOWED: readonly (readonly [THREE.MeshStandardMaterial, THREE.Color, number])[] = [
+  [MATERIALS.grass, MATERIALS.grass.color.clone(), 0.85],
+  [MATERIALS.roof, MATERIALS.roof.color.clone(), 0.8],
+  [MATERIALS.rock, MATERIALS.rock.color.clone(), 0.5],
+  [MATERIALS.tree, MATERIALS.tree.color.clone(), 0.35]
+];
 
 /** Eases the whole scene towards the selected time of day and weather. */
 export class Environment {
   private state: EnvState | null = null;
   private target: EnvState | null = null;
   private targetKey = '';
+  private stale = false;
 
   constructor(
     private readonly stage: Stage,
@@ -81,6 +89,11 @@ export class Environment {
     return this.state?.snow ?? 0;
   }
 
+  /** Re-applies everything on the next update, for scenery that was just built. */
+  refresh(): void {
+    this.stale = true;
+  }
+
   /** `carLights` is whether the ignition is on, which the headlights and dash glow depend on. */
   update(dt: number, tod: TimeOfDayId, weather: WeatherId, carLights: boolean): void {
     const power = carLights ? 1 : 0;
@@ -106,7 +119,8 @@ export class Environment {
       if (Math.abs(this.state[key] - target[key]) > 1e-4) moving = true;
       this.state[key] = lerp(this.state[key], target[key], k);
     }
-    if (moving) this.apply(this.state);
+    if (moving || this.stale) this.apply(this.state);
+    this.stale = false;
   }
 
   private apply(env: EnvState): void {
@@ -143,6 +157,7 @@ export class Environment {
     MATERIALS.line.emissiveIntensity = 0.35 * (1 - env.snow);
     MATERIALS.concrete.color.copy(CONCRETE_DRY).lerp(SNOW_COVER, env.snow * 0.55);
     MATERIALS.dark.color.copy(DARK_DRY).lerp(SNOW_COVER, env.snow * 0.35);
+    for (const [m, dry, cover] of SNOWED) m.color.copy(dry).lerp(SNOW_COVER, env.snow * cover);
     this.backdrop.applyEnvironment(env.fogC, env.fogD, env.win, env.star);
     this.particles.applyEnvironment(env.head);
   }

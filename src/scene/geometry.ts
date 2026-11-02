@@ -6,6 +6,19 @@ export const PLANE = new THREE.PlaneGeometry(1, 1);
 export const PLANE_L = new THREE.PlaneGeometry(1, 1, 1, 10);
 /** Long barriers and rails. */
 export const BOX_L = new THREE.BoxGeometry(1, 1, 1, 1, 1, 10);
+export const TREE_CONE = new THREE.ConeGeometry(1.7, 5, 7);
+/** A four-sided cone, turned to make a hipped roof. */
+export const ROOF_CONE = new THREE.ConeGeometry(5.7, 3, 4);
+
+const SHARED = new Set<THREE.BufferGeometry>([BOX, PLANE, PLANE_L, BOX_L, TREE_CONE, ROOF_CONE]);
+
+/** Frees the GPU buffers of everything under root, except the shared geometries above. */
+export function disposeTree(root: THREE.Object3D): void {
+  root.traverse(o => {
+    if (o instanceof THREE.InstancedMesh) o.dispose();
+    if (o instanceof THREE.Mesh && !SHARED.has(o.geometry)) o.geometry.dispose();
+  });
+}
 
 export function mesh(
   geo: THREE.BufferGeometry,

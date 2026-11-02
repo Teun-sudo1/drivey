@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { colorTexture, createCanvas } from '../../lib/canvas';
 import { clamp } from '../../lib/math';
+import type { MirrorLamps } from '../../routes/types';
 import { BOX, mesh } from '../geometry';
 import { MIRROR_DISTANCE, MIRROR_OUTER_HEIGHT, type Framing } from '../stage';
 import type { GlassOccluder } from './cockpit';
@@ -11,7 +12,8 @@ const ROOF_Y = 0.49;
 const STEM_WIDTH = 0.018;
 const CANVAS_W = 320, CANVAS_H = 92;
 const DRAW_INTERVAL = 1 / 15;
-const LAMP_SPACING = 20, LAMP_COUNT = 5;
+/** How far back lamps are drawn, in metres. */
+const LAMP_RANGE = 100;
 const DASH_SPACING = 10, DASH_COUNT = 8;
 /** Projection scale from metres behind the car to canvas pixels. */
 const FOCAL = 60;
@@ -29,7 +31,6 @@ const HEADRESTS = [
   { x: 248, base: 78, scale: 1.08 }
 ];
 
-const TEAL = '159,255,224', SODIUM = '255,180,107';
 const ROAD_DRY = new THREE.Color(0x25262c);
 const ROAD_WET = new THREE.Color(0x15161b);
 const ROAD_SNOW = new THREE.Color(0x8d94a0);
@@ -98,6 +99,8 @@ export class Mirror {
   private drawTimer = DRAW_INTERVAL;
   private travelled = 0;
   private clock = 0;
+  private lampSpacing = Infinity;
+  private lampColors: [string, string] = ['', ''];
 
   constructor(parent: THREE.Object3D, housing: THREE.Material) {
     const { canvas, ctx } = createCanvas(CANVAS_W, CANVAS_H);
@@ -134,6 +137,15 @@ export class Mirror {
     this.stem.position.y = (stemBottom + stemTop) / 2;
     this.stem.scale.y = stemTop - stemBottom;
     this.stemOutline[2].y = this.stemOutline[3].y = stemTop;
+  }
+
+  /** The streetlights of the road behind, which differ by route. */
+  setLamps(lamps: MirrorLamps): void {
+    this.lampSpacing = lamps.spacing;
+    this.lampColors = lamps.colors.map(hex => {
+      const c = new THREE.Color(hex);
+      return `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
+    }) as [string, string];
   }
 
   setEnvironment(env: MirrorEnvironment): void {
@@ -186,10 +198,11 @@ export class Mirror {
     }
 
     g.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < LAMP_COUNT; i++) {
-      const z = (i * LAMP_SPACING + this.travelled) % (LAMP_COUNT * LAMP_SPACING) + 4;
+    const lampCount = Number.isFinite(this.lampSpacing) ? Math.ceil(LAMP_RANGE / this.lampSpacing) : 0;
+    for (let i = 0; i < lampCount; i++) {
+      const z = (i * this.lampSpacing + this.travelled) % (lampCount * this.lampSpacing) + 4;
       const side = i % 2 ? 1 : -1, s = FOCAL / z;
-      this.glow(vx + side * 5 * s, HORIZON_Y - 7 * s, Math.min(26, 3.2 * s), i % 2 ? TEAL : SODIUM, this.lampLevel * 0.9);
+      this.glow(vx + side * 5 * s, HORIZON_Y - 7 * s, Math.min(26, 3.2 * s), this.lampColors[i % 2], this.lampLevel * 0.9);
     }
     // A car following at a loose distance.
     const followZ = 26 + Math.sin(this.clock * 0.23) * 5, s = FOCAL / followZ;

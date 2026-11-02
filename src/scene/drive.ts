@@ -27,8 +27,15 @@ export class Drive {
     private readonly pool: ChunkPool,
     private readonly backdrop: Backdrop,
     private readonly cockpit: Cockpit,
-    private readonly route: RouteDefinition
+    private route: RouteDefinition
   ) {}
+
+  setRoute(route: RouteDefinition): void {
+    this.route = route;
+    // Straightens out, then picks curves suited to the new road.
+    this.bendTarget = 0;
+    this.bendTimer = rand(4, 10);
+  }
 
   update(dt: number, engine: EngineState, slowed: boolean, reducedMotion: boolean, lampLevel: number): void {
     this.clock += dt;

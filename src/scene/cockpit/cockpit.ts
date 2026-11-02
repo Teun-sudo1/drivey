@@ -47,7 +47,7 @@ export class Cockpit {
   private navOffset = 0;
   private lcdKey = '';
 
-  constructor(camera: THREE.Camera, private readonly routeName: string) {
+  constructor(camera: THREE.Camera, private routeName: string) {
     const root = this.root;
     camera.add(root);
 
@@ -148,6 +148,11 @@ export class Cockpit {
   }
 
   /** Canvas text drawn before the web fonts load must be redrawn once they arrive. */
+  setRouteName(name: string): void {
+    this.routeName = name;
+    this.navTimer = NAV_INTERVAL;
+  }
+
   invalidateText(): void {
     this.lcdKey = '';
     this.gaugeTimer = GAUGE_INTERVAL;
