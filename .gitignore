@@ -7,4 +7,3 @@ coverage
 .env
 .env.local
 .DS_Store
-public/music/manifest.json

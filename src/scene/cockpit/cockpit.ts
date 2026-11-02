@@ -16,6 +16,7 @@ const LCD_X = -0.58;
 const SCREEN_POWER_RATE = 6;
 /** Full brightness of the gauges, LCD and nav screen. */
 const SCREEN_LEVELS = [1, 1, 0.73];
+const PILLAR_WIDTH = 0.11;
 
 /** Part of the interior that sits in front of the windshield, as a polygon local to `object`. */
 export interface GlassOccluder {
@@ -88,12 +89,13 @@ export class Cockpit {
     this.passLight.position.set(-0.2, 0.55, -0.5);
     root.add(this.dashLight, this.passLight);
 
-    this.addPillars(root, intB);
+    const pillars = this.addPillars(root, intB);
     hideFromReflection(root);
 
     const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
     this.glassOccluders = [
       ...this.mirror.occluders,
+      ...pillars,
       { object: navUnit, points: [V(-0.1, -0.145, 0), V(0.1, -0.145, 0), V(0.1, 0.145, 0), V(-0.1, 0.145, 0)] },
       { object: root, points: [V(-0.29, -0.265, -1.02), V(0.29, -0.265, -1.02), V(0.29, -0.5, -0.9), V(-0.29, -0.5, -0.9)] }
     ];
@@ -165,18 +167,29 @@ export class Cockpit {
     return sweep * 8;
   }
 
-  private addPillars(root: THREE.Group, material: THREE.Material): void {
-    const ends: [THREE.Vector3, THREE.Vector3][] = [
-      [new THREE.Vector3(-1.25, -0.47, -1.38), new THREE.Vector3(-0.98, 0.5, -0.78)],
-      [new THREE.Vector3(0.66, -0.47, -1.38), new THREE.Vector3(0.52, 0.5, -0.78)]
+  /** The A-pillars, returning each one's outline plus everything beyond it, where the glass ends. */
+  private addPillars(root: THREE.Group, material: THREE.Material): GlassOccluder[] {
+    const ends: [THREE.Vector3, THREE.Vector3, number][] = [
+      [new THREE.Vector3(-1.25, -0.47, -1.38), new THREE.Vector3(-0.98, 0.5, -0.78), -1],
+      [new THREE.Vector3(0.66, -0.47, -1.38), new THREE.Vector3(0.52, 0.5, -0.78), 1]
     ];
-    for (const [a, b] of ends) {
+    return ends.map(([a, b, outward]) => {
       const pillar = new THREE.Mesh(BOX, material);
-      pillar.scale.set(0.11, 0.08, a.distanceTo(b));
+      pillar.scale.set(PILLAR_WIDTH, 0.08, a.distanceTo(b));
       pillar.position.copy(a).add(b).multiplyScalar(0.5);
       // lookAt works in world space, so aim it while it has no parent.
       pillar.lookAt(b);
       root.add(pillar);
-    }
+      const inner = -outward * PILLAR_WIDTH / 2;
+      return {
+        object: root,
+        points: [
+          new THREE.Vector3(a.x + inner, a.y - 0.1, a.z),
+          new THREE.Vector3(b.x + inner, b.y + 0.1, b.z),
+          new THREE.Vector3(b.x + outward * 3, b.y + 0.1, b.z),
+          new THREE.Vector3(a.x + outward * 3, a.y - 0.1, a.z)
+        ]
+      };
+    });
   }
 }

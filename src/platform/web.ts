@@ -17,43 +17,6 @@ const storage: KeyValueStorage = {
   }
 };
 
-/** A key-value store in IndexedDB, which holds far more than localStorage. */
-function createIndexedDbCache(): KeyValueStorage {
-  const STORE = 'kv';
-  let opened: Promise<IDBDatabase | null> | null = null;
-  const open = (): Promise<IDBDatabase | null> => {
-    opened ??= new Promise(resolve => {
-      try {
-        const req = indexedDB.open('drivey-cache', 1);
-        req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => resolve(null);
-      } catch {
-        resolve(null);
-      }
-    });
-    return opened;
-  };
-  const run = async <T>(mode: IDBTransactionMode, op: (s: IDBObjectStore) => IDBRequest<T>): Promise<T | null> => {
-    const db = await open();
-    if (!db) return null;
-    return new Promise(resolve => {
-      const req = op(db.transaction(STORE, mode).objectStore(STORE));
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
-    });
-  };
-  return {
-    async get(key) {
-      const v = await run<unknown>('readonly', s => s.get(key));
-      return typeof v === 'string' ? v : null;
-    },
-    async set(key, value) {
-      await run('readwrite', s => s.put(value, key));
-    }
-  };
-}
-
 function createWakeLock(): KeepAwake {
   let wanted = false;
   let lock: WakeLockSentinel | null = null;
@@ -94,5 +57,5 @@ function createWakeLock(): KeepAwake {
 }
 
 export function createWebPlatform(): Platform {
-  return { storage, cache: createIndexedDbCache(), keepAwake: createWakeLock() };
+  return { storage, keepAwake: createWakeLock() };
 }

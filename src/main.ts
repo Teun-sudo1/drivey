@@ -12,13 +12,7 @@ import { Effects } from './audio/effects';
 import { Engine } from './app/engine';
 import { startLoop } from './app/loop';
 import { DURATION_LIMITS, SettingsStore, type DriveSide, type DurationKey, type ToggleKey } from './app/settings';
-import { TimedCache } from './music/cache';
-import { GeneratedProvider } from './music/generated';
-import { JamendoProvider } from './music/jamendo';
-import { LocalProvider } from './music/local';
 import { MusicPlayer } from './music/player';
-import { TrackPrefs } from './music/prefs';
-import { RadioProvider } from './music/radio';
 import { getPlatform } from './platform';
 import { ROUTES, type RouteId } from './routes';
 import { Backdrop } from './scene/backdrop';
@@ -48,14 +42,11 @@ import { TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './weat
 import { createWindshield } from './weather/windshield';
 
 const MIRROR_GAP_PX = 8;
-/** Jamendo search results are kept this long, to stay well inside the free tier's monthly cap. */
-const JAMENDO_CACHE_MS = 24 * 60 * 60 * 1000;
 const MOBILE_PARTICLES = 1100;
 const DESKTOP_PARTICLES = 2000;
 
 const platform = getPlatform();
 const settings = await SettingsStore.load(platform.storage);
-const trackPrefs = await TrackPrefs.load(platform.storage);
 
 /* Scene */
 let route = ROUTES[settings.value.route];
@@ -80,14 +71,7 @@ const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera
 const audio = new AudioEngine();
 const ambience = new Ambience(audio);
 const effects = new Effects(audio);
-const jamendo = new JamendoProvider(import.meta.env.VITE_JAMENDO_CLIENT_ID ?? '', new TimedCache(platform.cache, JAMENDO_CACHE_MS));
-const player = new MusicPlayer(
-  audio,
-  { jamendo, radio: new RadioProvider(), local: new LocalProvider(import.meta.env.BASE_URL), generated: new GeneratedProvider() },
-  trackPrefs,
-  toast,
-  () => settings.value.mix.music
-);
+const player = new MusicPlayer(audio);
 windshield.onStroke(() => effects.swish());
 // Turning the key is the gesture that lets the browser make sound.
 for (const type of ['pointerdown', 'keydown'] as const) $('#ignition').addEventListener(type, () => audio.unlock());
@@ -99,8 +83,7 @@ engine.onChange(state => {
 function applyMusic(): void {
   const s = settings.value;
   audio.setMuted(s.muted);
-  player.shuffle = s.shuffle;
-  player.configure(s.style, s.sources[s.style]);
+  player.setStyle(s.style);
   const wanted = s.musicOn && engine.running;
   if (wanted !== player.playing) {
     if (wanted) player.play();
@@ -157,7 +140,7 @@ const sceneControls = [
   ...[$('#segTod'), $('#startTod')].map(el => mountSegmented<TimeOfDayId>(el, options(TIMES_OF_DAY), () => settings.value.tod, tod => settings.update({ tod }))),
   ...[$('#segWeather'), $('#startWeather')].map(el => mountSegmented<WeatherId>(el, options(WEATHERS), () => settings.value.weather, weather => settings.update({ weather })))
 ];
-const refreshSoundPanel = createSoundPanel(settings, player, jamendo.enabled);
+const refreshSoundPanel = createSoundPanel(settings, player);
 settings.onChange(() => {
   hud.render();
   for (const refresh of sceneControls) refresh();
@@ -252,5 +235,5 @@ startLoop(dt => {
 
 // Lets the browser tests read scene state. Compiled out of the public build.
 if (import.meta.env.MODE === 'e2e') {
-  Object.assign(window, { __drivey: { simulate, engine, startScreen, stage, postfx, pool, backdrop, traffic, cockpit, drive, audio, ambience, effects, player, trackPrefs, environment, particles, windshield, roadSurface, timer, settings } });
+  Object.assign(window, { __drivey: { simulate, engine, startScreen, stage, postfx, pool, backdrop, traffic, cockpit, drive, audio, ambience, effects, player, environment, particles, windshield, roadSurface, timer, settings } });
 }

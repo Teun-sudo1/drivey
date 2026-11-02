@@ -28,9 +28,6 @@ jobs:
       # The browser tests run locally before each push (npm run test:e2e), which
       # keeps deploys to about a minute.
       - run: npm run build
-        env:
-          # Optional repository secret; without it the site plays radio, local and generated music.
-          VITE_JAMENDO_CLIENT_ID: ${{ secrets.JAMENDO_CLIENT_ID }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

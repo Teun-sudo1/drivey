@@ -116,6 +116,36 @@ test.describe('windshield', () => {
     expect(await glassPixels(page)).toBe(0);
   });
 
+  for (const driveSide of ['left', 'right'] as const) {
+    test(`with the wheel on the ${driveSide === 'left' ? 'right' : 'left'}, rain and wipers stay inside the pillars`, async ({ page }) => {
+      test.skip(isPortrait(page), 'the pillars are off screen in portrait');
+      await openApp(page, { weather: 'heavy', driveSide });
+      // Strips just beyond each A-pillar, at its middle, out to the edge of the screen.
+      const outside = await page.evaluate(() => {
+        const { cockpit, stage } = window.__drivey;
+        stage.camera.updateMatrixWorld(true);
+        return cockpit.glassOccluders.slice(2, 4).map((o: any) => {
+          const [bottomInner, topInner, topOuter] = o.points.map((p: any) => {
+            const v = o.object.localToWorld(p.clone()).project(stage.camera);
+            return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
+          });
+          const mid = { x: (bottomInner.x + topInner.x) / 2, y: (bottomInner.y + topInner.y) / 2 };
+          const out = Math.sign(topOuter.x - topInner.x);
+          return out > 0
+            ? { left: Math.min(innerWidth, mid.x + 10), right: innerWidth, top: mid.y - 25, bottom: mid.y + 25 }
+            : { left: 0, right: Math.max(0, mid.x - 10), top: mid.y - 25, bottom: mid.y + 25 };
+        });
+      });
+      expect(outside.some((r: any) => r.right - r.left > 20)).toBe(true);
+      // Across a few wiper strokes, with drops landing everywhere.
+      for (let i = 0; i < 6; i++) {
+        await advance(page, 0.4);
+        for (const rect of outside) expect(await glassPixels(page, rect)).toBe(0);
+      }
+      expect(await glassPixels(page)).toBeGreaterThan(50);
+    });
+  }
+
   test('nothing on the glass is drawn over the mirror or below the dashboard', async ({ page }) => {
     await openApp(page, { weather: 'heavy' });
     await advance(page, 3);

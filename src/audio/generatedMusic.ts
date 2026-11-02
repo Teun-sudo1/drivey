@@ -25,6 +25,8 @@ export class GeneratedMusic {
   private bar = 0;
   private nextTime = 0;
   private melodyLeft = 0;
+  /** Semitones the whole piece is moved by, so each variation sits in its own key. */
+  private transpose = 0;
 
   constructor(private readonly graph: AudioGraph, output: AudioNode) {
     const { ctx, noise } = graph;
@@ -50,8 +52,9 @@ export class GeneratedMusic {
     return this.timer !== 0;
   }
 
-  start(id: StyleId): void {
+  start(id: StyleId, transpose = 0): void {
     this.stop();
+    this.transpose = transpose;
     const style = (this.style = GENERATED_STYLES[id]);
     this.wet.gain.value = style.wet;
     this.dry.gain.value = 1 - style.wet * 0.4;
@@ -117,7 +120,7 @@ export class GeneratedMusic {
 
   private note(voice: NoteVoice, midi: number, t: number, dur: number, vel: number): void {
     const { ctx } = this.graph;
-    const f = midiToHz(midi), g = ctx.createGain();
+    const f = midiToHz(midi + this.transpose), g = ctx.createGain();
     // A slow wobble, like a tape that isn't quite steady.
     const wobble = Math.sin(t * 2.2) * 7;
     const oscillator = (type: OscillatorType, freq: number, gain: number, detune = 0): [OscillatorNode, GainNode] => {

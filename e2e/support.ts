@@ -18,7 +18,7 @@ const isLocal = (url: string): boolean => /^(https?:\/\/(localhost|127\.0\.0\.1|
 
 /**
  * Fails any test during which the page throws or logs an error, and keeps
- * every test off the real internet: music services are faked per test.
+ * every test off the real internet.
  */
 export const test = base.extend<{ pageErrors: string[] }>({
   pageErrors: [
@@ -38,25 +38,6 @@ export const test = base.extend<{ pageErrors: string[] }>({
     { auto: true }
   ]
 });
-
-/** A WAV of a soft tone, for faked music streams. */
-export function toneWav(seconds: number, hz = 330): Buffer {
-  const rate = 8000, samples = Math.round(rate * seconds), b = Buffer.alloc(44 + samples * 2);
-  b.write('RIFF', 0);
-  b.writeUInt32LE(36 + samples * 2, 4);
-  b.write('WAVEfmt ', 8);
-  b.writeUInt32LE(16, 16);
-  b.writeUInt16LE(1, 20);
-  b.writeUInt16LE(1, 22);
-  b.writeUInt32LE(rate, 24);
-  b.writeUInt32LE(rate * 2, 28);
-  b.writeUInt16LE(2, 32);
-  b.writeUInt16LE(16, 34);
-  b.write('data', 36);
-  b.writeUInt32LE(samples * 2, 40);
-  for (let i = 0; i < samples; i++) b.writeInt16LE(Math.round(Math.sin((2 * Math.PI * hz * i) / rate) * 3000), 44 + i * 2);
-  return b;
-}
 
 export { expect };
 
