@@ -6,9 +6,10 @@ export interface SceneLights {
   headlights: THREE.SpotLight;
 }
 
-export function setLightsSide(lights: SceneLights, side: number): void {
-  lights.headlights.position.x = -0.4 * side;
-  lights.headlights.target.position.x = -0.6 * side;
+/** Keeps the headlights on our car: its side of the road, and any lane change, as a world x shift. */
+export function placeHeadlights(lights: SceneLights, side: number, offset: number): void {
+  lights.headlights.position.x = -0.4 * side + offset;
+  lights.headlights.target.position.x = -0.6 * side + offset;
 }
 
 export function createLights(scene: THREE.Scene): SceneLights {

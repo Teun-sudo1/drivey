@@ -131,7 +131,39 @@ test.describe('ambient mixer', () => {
 const faders = (page: Page): Promise<number[]> => page.evaluate(() => window.__drivey.player.decks.map((d: any) => d.fader.gain.value));
 const sequencers = (page: Page) => page.evaluate(() => window.__drivey.player.decks.map((d: any) => d.music.playing));
 
+test.describe('timer buttons', () => {
+  test('click like dashboard switches when pressed, but not when a phase ends by itself', async ({ page }) => {
+    await startDriving(page);
+    await page.evaluate(() => {
+      const { effects } = window.__drivey;
+      (window as any).presses = [];
+      effects.press = (start: boolean) => (window as any).presses.push(start);
+    });
+    await page.click('#btnPlay');
+    await page.click('#btnPlay');
+    await page.click('#btnSkip');
+    await page.click('#btnReset');
+    await page.click('#btnPlay');
+    await page.evaluate(() => {
+      const { timer } = window.__drivey;
+      timer.endAt = Date.now() - 1;
+      timer.tick();
+    });
+    expect(await page.evaluate(() => (window as any).presses)).toEqual([true, false, false, false, true]);
+  });
+});
+
 test.describe('music', () => {
+  test('the 80s rock station plays like any other style', async ({ page }) => {
+    await startDriving(page);
+    await page.click('#btnPanel');
+    await page.click('[data-tab="sound"]');
+    await page.click('#segStyle button:has-text("80s rock")');
+    await expect(page.locator('#npTitle')).toHaveText('80s rock beats');
+    await expect.poll(async () => (await sequencers(page)).filter(Boolean).length).toBeGreaterThan(0);
+    expect(await page.evaluate(() => window.__drivey.player.style)).toBe('rock80s');
+  });
+
   test('quiet beats play while setting up and come up with the engine, made without a single network request', async ({ page }) => {
     const outside: string[] = [];
     page.on('request', r => {

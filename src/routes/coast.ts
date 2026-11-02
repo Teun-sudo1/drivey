@@ -3,7 +3,7 @@ import { pick, rand } from '../lib/math';
 import { SEA_Y } from '../scene/backdrop';
 import { BOX, BOX_L, PALM_FRONDS, PALM_TRUNK, PLANE, PLANE_L, TREE_CONE, mesh } from '../scene/geometry';
 import { LAMP_SODIUM, MATERIALS, NEON_CYAN, NEON_PINK, NEON_SIGN_MATERIALS, PASTELS } from '../scene/materials';
-import { CHUNK_LENGTH, addLamp, addRoadBase } from './parts';
+import { CHUNK_LENGTH, Instances, addLamp, addRoadBase, addVariant } from './parts';
 import type { Chunk, RouteDefinition } from './types';
 
 const CH = CHUNK_LENGTH;
@@ -20,26 +20,6 @@ const LAND_CLEAR = 7.8;
 
 /** Height of the sand at x, on the sea side. */
 const sandY = (x: number): number => BEACH_TOP - ((BEACH_EDGE - x) / BEACH_WIDTH) * BEACH_DROP;
-
-/** Up to `max` instances of one shape, placed with `add` calls; any left over aren't drawn. */
-class Instances {
-  readonly mesh: THREE.InstancedMesh;
-  private readonly m = new THREE.Matrix4();
-  private readonly q = new THREE.Quaternion();
-  private readonly e = new THREE.Euler();
-
-  constructor(geometry: THREE.BufferGeometry, material: THREE.Material, max: number, parent: THREE.Object3D) {
-    this.mesh = new THREE.InstancedMesh(geometry, material, max);
-    this.mesh.count = 0;
-    parent.add(this.mesh);
-  }
-
-  add(x: number, y: number, z: number, sx: number, sy: number, sz: number, turn = 0, color?: THREE.Color): void {
-    const i = this.mesh.count++;
-    this.mesh.setMatrixAt(i, this.m.compose(new THREE.Vector3(x, y, z), this.q.setFromEuler(this.e.set(0, turn, 0)), new THREE.Vector3(sx, sy, sz)));
-    if (color) this.mesh.setColorAt(i, color);
-  }
-}
 
 /** Palms, each a trunk and a crown drawn as two instanced meshes. */
 function palms(parent: THREE.Object3D, spots: readonly (readonly [x: number, z: number])[]): void {
@@ -100,8 +80,7 @@ function addUmbrellas(chunk: Chunk): void {
 }
 
 /** Rocks and a cliff, each set back far enough that no corner reaches the road. */
-function cliffs(): THREE.Object3D {
-  const o = new THREE.Group();
+function cliffs(o: THREE.Object3D): void {
   mesh(PLANE_L, M.grass, 6.4, -0.01, -CH / 2, 2.6, CH, 1, o).rotation.x = -Math.PI / 2;
   for (let k = 0; k < 7; k++) {
     const big = k < 4;
@@ -115,12 +94,10 @@ function cliffs(): THREE.Object3D {
   }
   // The cliff itself, behind the rocks.
   mesh(BOX_L, M.cliff, rand(32, 40), 9, -CH / 2, 12, rand(22, 30), CH, o);
-  return o;
 }
 
 /** A strip of 80s motels in pastels, trimmed with neon, with a glowing sign by the road. */
-function beachTown(): THREE.Object3D {
-  const o = new THREE.Group();
+function beachTown(chunk: Chunk, o: THREE.Object3D): void {
   mesh(PLANE_L, M.concrete, 7.3, 0.02, -CH / 2, 4, CH, 1, o).rotation.x = -Math.PI / 2;
   const walls = new Instances(BOX, M.tinted, 6, o);
   const neon = new Instances(BOX, M.neon, 9, o);
@@ -142,7 +119,7 @@ function beachTown(): THREE.Object3D {
     z -= d + rand(3, 8);
   }
   palms(o, [[9.2, -rand(0, CH)], [9.6, -rand(0, CH)], [rand(14, 30), -rand(0, CH)]]);
-  return o;
+  addNeonSign(chunk, o);
 }
 
 /** A pylon sign by the road, turned to face the oncoming driver. */
@@ -155,8 +132,7 @@ function addNeonSign(chunk: Chunk, parent: THREE.Object3D): void {
 }
 
 /** Dunes and a grove of palms, with now and then a pastel beach house. */
-function palmGrove(chunk: Chunk): THREE.Object3D {
-  const o = new THREE.Group();
+function palmGrove(chunk: Chunk, o: THREE.Object3D): void {
   mesh(PLANE_L, M.sand, 12, 0.01, -CH / 2, 13, CH, 1, o).rotation.x = -Math.PI / 2;
   const dunes = new Instances(TREE_CONE, M.sand, 4, o);
   for (let k = 0; k < 4; k++) dunes.add(rand(17, 30), -0.3, -rand(0, CH), rand(2.5, 4.5), rand(0.25, 0.45), rand(2.5, 4), rand(0, Math.PI));
@@ -171,7 +147,6 @@ function palmGrove(chunk: Chunk): THREE.Object3D {
     parts.add(x, 4.15, z, 7.8, 0.3, 6.8, 0, WHITE);
     mesh(PLANE, M.warmWindow, x - 3.52, 2.3, z, 1.4, 1.1, 1, house).rotation.y = -Math.PI / 2;
   }
-  return o;
 }
 
 /**
@@ -180,17 +155,13 @@ function palmGrove(chunk: Chunk): THREE.Object3D {
  * neon-lit motel strip, or palm groves and dunes.
  */
 function buildChunk(chunk: Chunk, i: number): void {
-  const g = chunk.group;
   addRoadBase(chunk, -2.3, 5.1, [-2.05, 4.85], [1.4]);
   addBeach(chunk);
   addLifeguardHut(chunk);
   addUmbrellas(chunk);
-  const town = beachTown();
-  addNeonSign(chunk, town);
-  for (const variant of [cliffs(), town, palmGrove(chunk)]) {
-    g.add(variant);
-    chunk.variants.push(variant);
-  }
+  cliffs(addVariant(chunk));
+  beachTown(chunk, addVariant(chunk));
+  palmGrove(chunk, addVariant(chunk));
   if (i % 2 === 0) addLamp(chunk, 5.7, -20, -3.8, 8, LAMP_SODIUM);
 }
 

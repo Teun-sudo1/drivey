@@ -3,7 +3,7 @@ import { expect, openApp, openParked, openSceneTab, test, update } from './suppo
 test.describe('scene presets', () => {
   test('one tap on the start screen sets the route, time, weather and music', async ({ page }) => {
     await openParked(page, { route: 'city', tod: 'night', weather: 'rain', style: 'chillhop' });
-    await expect(page.locator('#startPreset button.on')).toHaveText('Rainy Tokyo night');
+    await expect(page.locator('#startPreset button.on')).toHaveText('Rainy city night');
 
     await page.locator('#startPreset button:has-text("Foggy coast at dusk")').click();
     expect(await page.evaluate(() => {

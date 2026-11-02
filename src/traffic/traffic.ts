@@ -7,7 +7,13 @@ import { CAR_GLOWS, CAR_LENGTH, TRUCK_LENGTH, makeVehicle } from './cars';
 
 const TRUCK_SHARE = 0.15;
 const LANE_CHANGE_SECONDS = 3;
-const LANE_CHANGE_EVERY = [10, 30] as const;
+const LANE_CHANGE_EVERY = [6, 18] as const;
+/** How often our own car moves over on a multi-lane road, and how long it takes. */
+const OWN_CHANGE_EVERY = [40, 90] as const;
+const OWN_CHANGE_SECONDS = 4;
+/** We only move over above this speed, with this much room in the lane, ahead and behind. */
+const OWN_CHANGE_SPEED = 8;
+const OWN_CHANGE_ROOM_AHEAD = 40, OWN_CHANGE_ROOM_BEHIND = 30;
 /** Gap a car keeps to the one in front, bumper to bumper. */
 const FOLLOW_GAP = 12;
 /** Room a car needs beside it before it moves over. */
@@ -42,11 +48,20 @@ export interface Vehicle {
 
 const smoothstep = (t: number): number => t * t * (3 - 2 * t);
 
+/** Our own car's place on the road: which lane, and how far through a change. */
+interface OwnLane {
+  lane: number;
+  fromLane: number;
+  shift: number;
+  timer: number;
+}
+
 /** Cars ahead and oncoming, which follow the road's lanes and keep clear of each other and of us. */
 export class Traffic {
   readonly group = new THREE.Group();
   vehicles: Vehicle[] = [];
   private route: RouteDefinition;
+  private own: OwnLane = { lane: 0, fromLane: 0, shift: 1, timer: 0 };
 
   constructor(scene: THREE.Scene, route: RouteDefinition) {
     scene.add(this.group);
@@ -62,6 +77,8 @@ export class Traffic {
       disposeTree(v.group);
     }
     this.vehicles = [];
+    const first = route.traffic.ahead[0];
+    this.own = { lane: first, fromLane: first, shift: 1, timer: rand(...OWN_CHANGE_EVERY) };
     const { aheadCount, oncomingCount } = route.traffic;
     for (let i = 0; i < aheadCount; i++) this.add(false, rand(30, 380));
     for (let i = 0; i < oncomingCount; i++) this.add(true, rand(50, 500));
@@ -73,15 +90,26 @@ export class Traffic {
   }
 
   /** Lateral position of a vehicle, part way through any lane change. */
-  laneX(v: Vehicle): number {
+  laneX(v: Pick<Vehicle, 'lane' | 'fromLane' | 'shift'>): number {
     return lerp(v.fromLane, v.lane, smoothstep(v.shift));
+  }
+
+  /** How far our car sits from the first lane, sideways, before mirroring. */
+  get ownOffset(): number {
+    return this.laneX(this.own) - this.route.traffic.ahead[0];
+  }
+
+  /** The lanes our car is in: one, or two while moving over. */
+  private ownLanes(): number[] {
+    return this.own.shift < 1 ? [this.own.fromLane, this.own.lane] : [this.own.lane];
   }
 
   update(dt: number, ourSpeed: number, headlights: number): void {
     CAR_GLOWS.tail.opacity = 0.35 + 0.65 * headlights;
     CAR_GLOWS.head.opacity = 0.25 + 0.75 * headlights;
-    const ownLane = this.route.traffic.ahead[0];
-    this.pushAhead(ourSpeed, ownLane);
+    this.steerOwn(dt, ourSpeed);
+    const ownLanes = this.ownLanes();
+    this.pushAhead(ourSpeed, ownLanes);
     for (const v of this.vehicles) {
       const leader = this.leader(v);
       let desired = v.cruise;
@@ -89,26 +117,28 @@ export class Traffic {
         const gap = Math.abs(leader.z - v.z) - (leader.length + v.length) / 2;
         if (gap < FOLLOW_GAP) {
           desired = Math.min(desired, leader.speed * (gap < FOLLOW_GAP / 2 ? 0.9 : 1));
-          if (!v.oncoming) v.changeTimer = Math.min(v.changeTimer, 0);
+          v.changeTimer = Math.min(v.changeTimer, 0);
         }
       }
+      // Anyone behind us in our lane, after we've moved over in front of them, drops back.
+      if (!v.oncoming && v.z > OUR_FRONT && ownLanes.some(l => this.occupies(v, l))) desired = Math.min(desired, ourSpeed * 0.95);
       v.speed = lerp(v.speed, Math.max(desired, v.floor), damp(SPEED_EASE, dt));
       v.z += (v.oncoming ? ourSpeed + v.speed : ourSpeed - v.speed) * dt;
-      if (!v.oncoming) this.steer(v, dt, ownLane);
+      this.steer(v, dt, ownLanes);
       this.recycle(v, ourSpeed);
       this.place(v);
     }
   }
 
   /**
-   * We never brake or change lanes, so a car we catch up with in our lane pulls
-   * away, and so does any car it would then run into, all the way up the queue.
+   * We never brake, so a car we catch up with in our lane pulls away, and so
+   * does any car it would then run into, all the way up the queue.
    */
-  private pushAhead(ourSpeed: number, ownLane: number): void {
+  private pushAhead(ourSpeed: number, ownLanes: readonly number[]): void {
     for (const v of this.vehicles) v.floor = 0;
     for (const lane of this.route.traffic.ahead) {
       const queue = this.vehicles.filter(v => !v.oncoming && this.occupies(v, lane) && v.z < OUR_FRONT + v.length / 2).sort((a, b) => b.z - a.z);
-      let front = OUR_FRONT, push = lane === ownLane ? ourSpeed * 1.04 : 0, reach = OWN_LANE_BUFFER;
+      let front = OUR_FRONT, push = ownLanes.includes(lane) ? ourSpeed * 1.04 : 0, reach = OWN_LANE_BUFFER;
       for (const v of queue) {
         if (push === 0 || front - (v.z + v.length / 2) > reach) break;
         v.floor = Math.max(v.floor, push);
@@ -154,9 +184,10 @@ export class Traffic {
       return;
     }
     if (v.z < -470) {
-      // On a multi-lane road it comes back as a faster car overtaking us.
-      if (ahead.length > 1 && Math.random() < 0.5) {
-        this.spawn(v, 20, ahead.slice(1));
+      // On a multi-lane road it comes back as a faster car overtaking us, in a lane we aren't in.
+      const passing = ahead.filter(l => !this.ownLanes().includes(l));
+      if (passing.length && Math.random() < 0.5) {
+        this.spawn(v, 20, passing);
         v.cruise = this.route.speed * rand(1.08, 1.2);
         v.speed = Math.max(v.cruise, ourSpeed * 1.08);
       } else {
@@ -170,23 +201,45 @@ export class Traffic {
   }
 
   /** Every so often, or when stuck behind someone, moves over to another lane with room. */
-  private steer(v: Vehicle, dt: number, ownLane: number): void {
+  private steer(v: Vehicle, dt: number, ownLanes: readonly number[]): void {
     if (v.shift < 1) {
       v.shift = Math.min(1, v.shift + dt / LANE_CHANGE_SECONDS);
       if (v.shift === 1) v.fromLane = v.lane;
       return;
     }
-    const { ahead } = this.route.traffic;
+    const lanes = v.oncoming ? this.route.traffic.oncoming : this.route.traffic.ahead;
     v.changeTimer -= dt;
-    if (ahead.length < 2 || v.changeTimer > 0) return;
+    if (lanes.length < 2 || v.changeTimer > 0) return;
     v.changeTimer = rand(...LANE_CHANGE_EVERY);
-    const target = pick(ahead.filter(l => l !== v.lane));
-    if (target === ownLane && v.z > OUR_FRONT - OWN_LANE_MERGE_AHEAD) return;
+    const target = pick(lanes.filter(l => l !== v.lane));
+    if (!v.oncoming && ownLanes.includes(target) && v.z > OUR_FRONT - OWN_LANE_MERGE_AHEAD) return;
     const clear = this.vehicles.every(o => o === v || !this.occupies(o, target) || Math.abs(o.z - v.z) > MERGE_CLEARANCE + (o.length + v.length) / 2);
     if (!clear) return;
     v.fromLane = v.lane;
     v.lane = target;
     v.shift = 0;
+  }
+
+  /** Now and then, on a road with more than one lane our way, moves us over when there's room. */
+  private steerOwn(dt: number, ourSpeed: number): void {
+    const own = this.own;
+    if (own.shift < 1) {
+      own.shift = Math.min(1, own.shift + dt / OWN_CHANGE_SECONDS);
+      if (own.shift === 1) own.fromLane = own.lane;
+      return;
+    }
+    const { ahead } = this.route.traffic;
+    if (ahead.length < 2 || ourSpeed < OWN_CHANGE_SPEED) return;
+    own.timer -= dt;
+    if (own.timer > 0) return;
+    const target = pick(ahead.filter(l => l !== own.lane));
+    const room = this.vehicles.every(v => v.oncoming || !this.occupies(v, target) || v.z + v.length / 2 < OUR_FRONT - OWN_CHANGE_ROOM_AHEAD || v.z - v.length / 2 > OWN_CHANGE_ROOM_BEHIND);
+    // Without room it tries again shortly.
+    own.timer = room ? rand(...OWN_CHANGE_EVERY) : 3;
+    if (!room) return;
+    own.fromLane = own.lane;
+    own.lane = target;
+    own.shift = 0;
   }
 
   /** The nearest vehicle in front of v in either lane it is in, in its direction of travel. */

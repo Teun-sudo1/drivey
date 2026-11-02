@@ -12,7 +12,7 @@ export interface ScenePreset {
 }
 
 export const SCENE_PRESETS: readonly ScenePreset[] = [
-  { name: 'Rainy Tokyo night', route: 'city', tod: 'night', weather: 'rain', style: 'chillhop' },
+  { name: 'Rainy city night', route: 'city', tod: 'night', weather: 'rain', style: 'chillhop' },
   { name: 'Storm on the expressway', route: 'city', tod: 'dusk', weather: 'heavy', style: 'jazzy' },
   { name: 'Foggy coast at dusk', route: 'coast', tod: 'dusk', weather: 'fog', style: 'ambient' },
   { name: 'Neon highway', route: 'highway', tod: 'night', weather: 'clear', style: 'synthwave' },

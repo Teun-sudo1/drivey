@@ -3,7 +3,7 @@ import { damp, lerp } from '../lib/math';
 import type { Backdrop } from '../scene/backdrop';
 import type { Cockpit } from '../scene/cockpit/cockpit';
 import type { SceneLights } from '../scene/lights';
-import { BUILDING_DAY_COLORS, BUILDING_NIGHT_COLOR, LAMP_KINDS, MATERIALS, NEON_SIGN_MATERIALS, SIGN_MATERIALS, WINDOW_MATERIALS } from '../scene/materials';
+import { BUILDING_DAY_COLORS, BUILDING_NIGHT_COLOR, LAMP_KINDS, MATERIALS, CITY_NEON_MATERIALS, NEON_SIGN_MATERIALS, SIGN_MATERIALS, WINDOW_MATERIALS } from '../scene/materials';
 import type { PostFx } from '../scene/postfx';
 import type { Stage } from '../scene/stage';
 import type { Particles } from './particles';
@@ -45,6 +45,7 @@ const LINE_DRY = new THREE.Color(0xd8d8d0);
 const CONCRETE_DRY = new THREE.Color(0x5a5b61);
 const DARK_DRY = new THREE.Color(0x1b1d22);
 const SNOW_COVER = new THREE.Color(0xaab2bf);
+const WATER_DAY = new THREE.Color(0x24627a);
 /** Natural surfaces and how fully snow covers each. */
 const SNOWED: readonly (readonly [THREE.MeshStandardMaterial, THREE.Color, number])[] = [
   [MATERIALS.grass, MATERIALS.grass.color.clone(), 0.85],
@@ -150,7 +151,8 @@ export class Environment {
     for (const m of SIGN_MATERIALS) m.emissiveIntensity = 0.05 + 0.3 * env.lamp;
     // Neon reads as pale tubes by day and glows into the bloom at night.
     MATERIALS.neon.color.setScalar(0.45 + 1.4 * env.lamp);
-    for (const m of NEON_SIGN_MATERIALS) m.color.setScalar(0.5 + 1.1 * env.lamp);
+    for (const m of [...NEON_SIGN_MATERIALS, ...CITY_NEON_MATERIALS]) m.color.setScalar(0.5 + 1.1 * env.lamp);
+    MATERIALS.water.color.copy(env.fogC).multiplyScalar(0.35).lerp(WATER_DAY, (1 - Math.min(1, env.win)) * 0.75);
     MATERIALS.under.color.setRGB(1, 0.85, 0.63).multiplyScalar(0.15 + 1.1 * env.lamp);
     for (const m of LAMP_KINDS.values()) {
       m.head.color.copy(m.base).multiplyScalar(0.15 + 2.85 * env.lamp);

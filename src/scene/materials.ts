@@ -29,6 +29,9 @@ export const MATERIALS = {
   tinted: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }),
   /** Neon tubes, tinted per instance; the environment dims them by day. */
   neon: new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),
+  /** Lakes, harbour basins and the water under causeways; the environment tints it like the sea. */
+  water: new THREE.MeshStandardMaterial({ color: 0x0b1a28, roughness: 0.25, metalness: 0.7 }),
+  crane: new THREE.MeshStandardMaterial({ color: 0xc8642a, roughness: 0.7 }),
   /** Tunnel lights burn day and night. */
   tunnelLight: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc56e).multiplyScalar(2.4) })
 };
@@ -54,10 +57,16 @@ export const PASTELS = [0xf7a8c4, 0x9fe3cf, 0xf9d98c, 0xc3a8f0, 0xffb894, 0x9fd0
 export const NEON_PINK = new THREE.Color(0xff3fa4);
 export const NEON_CYAN = new THREE.Color(0x3ff2ff);
 
+/** Shipping-container paint. */
+export const CONTAINER_COLORS = [0x9c3b2a, 0x2b5d8a, 0x2e7d6b, 0xc99a2e, 0x6d6f74, 0x8a2f4f].map(hex => new THREE.Color(hex));
+
+const neonSigns = (words: readonly string[]) =>
+  words.map((word, i) => new THREE.MeshBasicMaterial({ map: neonSignTexture(word, i % 2 ? NEON_CYAN : NEON_PINK), toneMapped: false }));
+
 /** Glowing roadside signs on the coast; dimmed by day along with the neon. */
-export const NEON_SIGN_MATERIALS = (['MOTEL', 'SURF', 'DINER', 'ARCADE', 'VACANCY', 'PALMS', 'VIDEO', 'OCEAN DR'] as const).map(
-  (word, i) => new THREE.MeshBasicMaterial({ map: neonSignTexture(word, i % 2 ? NEON_CYAN : NEON_PINK), toneMapped: false })
-);
+export const NEON_SIGN_MATERIALS = neonSigns(['MOTEL', 'SURF', 'DINER', 'ARCADE', 'VACANCY', 'PALMS', 'VIDEO', 'OCEAN DR']);
+/** Billboards in the city's nightlife district. */
+export const CITY_NEON_MATERIALS = neonSigns(['HOTEL', 'CINEMA', 'JAZZ', 'NOODLES', 'OPEN 24H', 'RECORDS', 'BAR', 'DANCE']);
 
 export interface LampMaterials {
   base: THREE.Color;

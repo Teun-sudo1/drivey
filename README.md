@@ -34,7 +34,7 @@ When adding a feature, add its test in `e2e/`, then break the feature on purpose
 
 ## Scene presets
 
-One tap sets the route, time of day, weather and music style together: Rainy Tokyo night, Storm on the expressway, Foggy coast at dusk, Neon highway, Snowy countryside and Sunday drive. They're on the start screen ("Quick start") and under Settings › Scene. Add or change them in `src/app/scenePresets.ts`.
+One tap sets the route, time of day, weather and music style together: Rainy city night, Storm on the expressway, Foggy coast at dusk, Neon highway, Snowy countryside and Sunday drive. They're on the start screen ("Quick start") and under Settings › Scene. Add or change them in `src/app/scenePresets.ts`.
 
 ## Tasks and stats
 
@@ -54,16 +54,18 @@ Pick a route on the start screen, or switch mid-drive under Settings › Scene:
 
 | Route | Road | Traffic |
 | --- | --- | --- |
-| City expressway | Elevated, between towers, with signs and overpasses | Two lanes our way, no oncoming |
+| City expressway | Elevated dual carriageway with signs and overpasses, past towers, a harbour with cranes and ships, or a neon nightlife district | Two lanes each way, with lane changes |
 | Coastal road | 80s style: a beach with palms, lifeguard huts and umbrellas down to the sea on our side; on the other, stretches of sandstone cliffs, neon-lit pastel motels, or palm groves and dunes | One lane each way |
-| Highway | Dual carriageway with gantries, overpasses and tunnels | Two lanes each way, with overtaking |
-| Countryside | Narrow lane through fields, trees and farmhouses | One lane each way, light |
+| Highway | Dual carriageway with gantries, overpasses and tunnels, through industry, pine forest, desert (with wide shoulders) or across a causeway | Two lanes each way, with overtaking |
+| Countryside | Narrow lane through farmland, villages (where it widens for parking) and past lakes | One lane each way, light |
+
+On roads with two lanes our way, our own car moves over now and then when there's room; cars behind it drop back, and nobody cuts in just ahead.
 
 A route is a `RouteDefinition` in `src/routes/`: a function that fills a 40 m chunk of road, plus its speed, curviness, traffic lanes, distant scenery and the lamps seen in the mirror. Text in a chunk goes in `chunk.labels` so it stays readable when driving on the right. Scenery that should change along the way goes in `chunk.variants`: one shows at a time, in stretches of three to seven chunks. To add a route, write one and add it to `ROUTES` in `src/routes/index.ts`.
 
 ## Music
 
-Music is lofi made live in the browser from oscillators and noise: drums, bass, chords and a sparse melody, with reverb and vinyl crackle. It needs no internet and plays no ads. Browsers only allow sound after a tap, so it starts quietly at the first tap on the start screen and comes up to full level once the engine runs. Under Settings › Sound, pick a style (Chillhop, Jazzy, Ambient, Synthwave, Rainy café); "next" crossfades to a fresh variation in another key. The patterns for each style are in `src/music/styles.ts`.
+Music is lofi made live in the browser from oscillators and noise: drums, bass, chords and a sparse melody, with reverb and vinyl crackle. It needs no internet and plays no ads. Browsers only allow sound after a tap, so it starts quietly at the first tap on the start screen and comes up to full level once the engine runs. Under Settings › Sound, pick a style (Chillhop, Jazzy, Ambient, Synthwave, Rainy café, 80s rock); "next" crossfades to a fresh variation in another key. The patterns for each style are in `src/music/styles.ts`.
 
 ## Ambient sound
 

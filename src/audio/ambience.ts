@@ -84,9 +84,9 @@ export class Ambience {
 
   private build(graph: AudioGraph): void {
     const { ctx, channels: ch, noise } = graph;
-    // Rain on glass: a hiss with a softer rumble under it.
-    loop(ctx, noise.white, [filter(ctx, 'highpass', 700), filter(ctx, 'lowpass', 7000)], ch.rain, 0.55);
-    loop(ctx, noise.brown, [filter(ctx, 'lowpass', 900)], ch.rain, 0.35);
+    // Rain on glass: a soft hiss over a rumble. Its top end stops at 3.2 kHz, which keeps it from sounding harsh.
+    loop(ctx, noise.white, [filter(ctx, 'highpass', 500), filter(ctx, 'lowpass', 3200)], ch.rain, 0.28);
+    loop(ctx, noise.brown, [filter(ctx, 'lowpass', 1100)], ch.rain, 0.45);
 
     // Engine: detuned saws and a sub, under road rumble.
     this.hum = ctx.createGain();

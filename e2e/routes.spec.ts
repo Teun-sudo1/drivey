@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import { advance, brightnessAt, expect, openApp, openParked, openSceneTab, screenOf, test, update, waitForFrames } from './support';
 
 const ROUTES = [
-  { id: 'city', name: 'City expressway', cruise: 22, ahead: 6, oncoming: 0 },
+  { id: 'city', name: 'City expressway', cruise: 22, ahead: 6, oncoming: 5 },
   { id: 'coast', name: 'Coastal road', cruise: 19, ahead: 3, oncoming: 4 },
   { id: 'highway', name: 'Highway', cruise: 28, ahead: 6, oncoming: 6 },
   { id: 'country', name: 'Countryside', cruise: 16, ahead: 2, oncoming: 3 }
@@ -84,9 +84,21 @@ test.describe('routes', () => {
   test('switching route mid-drive keeps the engine running and frees the old road', async ({ page }) => {
     await openApp(page, { route: 'city' });
     await waitForFrames(page);
-    const memory = () => page.evaluate(() => ({ ...window.__drivey.stage.renderer.info.memory }));
+    // Scenery is only uploaded once it's first shown, so everything is shown for one frame
+    // before counting; otherwise the count would depend on which kinds happened to be on screen.
+    const memory = () => page.evaluate(() => {
+      const { stage } = window.__drivey, hidden: any[] = [];
+      stage.scene.traverse((o: any) => {
+        if (!o.visible) hidden.push(o);
+        o.visible = true;
+      });
+      stage.renderer.render(stage.scene, stage.camera);
+      for (const o of hidden) o.visible = false;
+      return { ...stage.renderer.info.memory };
+    });
+    // Each lap ends on the countryside, whose scenery has a fixed number of parts.
     const lap = async () => {
-      for (const route of [...ROUTES.slice(1), ROUTES[0]]) {
+      for (const route of ROUTES) {
         await update(page, { route: route.id });
         await advance(page, 1);
         // Gives the renderer frames to upload the new road and release the old one.
@@ -98,7 +110,7 @@ test.describe('routes', () => {
     const before = await memory();
     await lap();
     const after = await memory();
-    // The city's towers are each a unique geometry, so a leak would add hundreds.
+    // The city's towers are each a unique geometry, so a leak would add hundreds; cars and trucks differ a little.
     expect(after.geometries).toBeLessThan(before.geometries + 20);
     // Every sign is uploaded at startup, so nothing new should appear; a leaked skyline adds 8 a lap.
     expect(after.textures).toBeLessThanOrEqual(before.textures);

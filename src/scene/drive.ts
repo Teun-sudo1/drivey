@@ -18,6 +18,8 @@ export class Drive {
   speed = 0;
   bend = 0;
   clock = 0;
+  /** Sideways shift of our car from its usual lane, in world metres, while it changes lanes. */
+  laneOffset = 0;
 
   private bendTarget = 0;
   private bendTimer = 0;
@@ -67,7 +69,7 @@ export class Drive {
     const t = this.clock, sway = reducedMotion ? REDUCED_MOTION_SWAY : 1;
     const crank = cranking && !reducedMotion ? CRANK_SHAKE : 0;
     camera.position.y = Math.sin(t * 61) * crank + eyeHeight + Math.sin(t * 9.3) * 0.0025 * sway * (this.speed / 22) + Math.sin(t * 1.7) * 0.004 * sway;
-    camera.position.x = Math.sin(t * 0.43) * 0.02 * sway;
+    camera.position.x = this.laneOffset + Math.sin(t * 0.43) * 0.02 * sway;
     camera.rotation.set(
       framing.pitch + Math.sin(t * 0.8) * 0.002 * sway,
       -this.bend * 20 + Math.sin(t * 0.31) * 0.006 * sway,

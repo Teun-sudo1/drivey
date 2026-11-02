@@ -1,6 +1,6 @@
-export type StyleId = 'chillhop' | 'jazzy' | 'ambient' | 'synthwave' | 'rainycafe';
+export type StyleId = 'chillhop' | 'jazzy' | 'ambient' | 'synthwave' | 'rainycafe' | 'rock80s';
 
-export type Voice = 'keys' | 'piano' | 'pad' | 'synth';
+export type Voice = 'keys' | 'piano' | 'pad' | 'synth' | 'guitar';
 
 interface Chord {
   /** Root, as a MIDI note, for the bass. */
@@ -21,6 +21,8 @@ export interface MusicStyle {
   brush?: boolean;
   walk?: boolean;
   arp?: boolean;
+  /** Chords played as palm-muted eighth notes rather than held, as rock guitar does. */
+  chug?: boolean;
   chordBars?: number;
   ch: Chord[];
   kick: string;
@@ -58,5 +60,11 @@ export const STYLES: Record<StyleId, MusicStyle> = {
     name: 'Rainy café', bpm: 68, swing: 0.2, voice: 'piano', wet: 0.3, crackle: 0.1,
     ch: [{ r: 39, n: [51, 55, 58, 62] }, { r: 36, n: [51, 55, 58, 60] }, { r: 41, n: [53, 56, 60, 63] }, { r: 34, n: [50, 53, 56, 58] }],
     kick: 'x.......x.......', snare: '............x...', hat: 'x...x...x...x...', bass: 'x.......x.......', scale: [63, 65, 67, 70, 72, 75], mel: 0.2
+  },
+  // Not from the prototype: power chords through a distortion stage over a driving beat.
+  rock80s: {
+    name: '80s rock', bpm: 126, swing: 0, voice: 'guitar', wet: 0.32, crackle: 0, chug: true,
+    ch: [{ r: 45, n: [57, 64, 69] }, { r: 40, n: [52, 59, 64] }, { r: 42, n: [54, 61, 66] }, { r: 38, n: [50, 57, 62] }],
+    kick: 'x.......x.x.....', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.x.', bass: 'x.x.x.x.x.x.x.x.', scale: [69, 72, 74, 76, 79, 81], mel: 0.12
   }
 };

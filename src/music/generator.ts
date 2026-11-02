@@ -7,7 +7,20 @@ import { STYLES, type MusicStyle, type StyleId } from './styles';
 const LOOKAHEAD = 0.15;
 const TICK_MS = 25;
 
-type NoteVoice = 'keys' | 'piano' | 'pad' | 'synth' | 'pluck' | 'bell' | 'bass';
+type NoteVoice = 'keys' | 'piano' | 'pad' | 'synth' | 'guitar' | 'lead' | 'pluck' | 'bell' | 'bass';
+
+/** How hard notes drive the distortion, and how far its output is brought back down. */
+const DRIVE_IN = 9, DRIVE_OUT = 0.11;
+
+/** A soft-clipping curve: quiet notes pass, loud ones flatten into a guitar amp's crunch. */
+function overdrive(amount: number): Float32Array<ArrayBuffer> {
+  const curve = new Float32Array(1024);
+  for (let i = 0; i < curve.length; i++) {
+    const x = (i / (curve.length - 1)) * 2 - 1;
+    curve[i] = ((1 + amount) * x) / (1 + amount * Math.abs(x));
+  }
+  return curve;
+}
 
 /**
  * Lofi made live from oscillators and noise, ported from the prototype: drums,
@@ -18,6 +31,8 @@ export class GeneratedMusic {
   private readonly wet: GainNode;
   private readonly dry: GainNode;
   private readonly crackle: GainNode;
+  /** Guitar notes go through this amp instead of straight in. */
+  private readonly amp: GainNode;
   private style: MusicStyle | null = null;
   private timer = 0;
   private step = 0;
@@ -45,6 +60,17 @@ export class GeneratedMusic {
     this.crackle.gain.value = 0;
     loop(ctx, noise.crackle, [filter(ctx, 'bandpass', 2500, 0.5)], this.crackle, 1);
     this.crackle.connect(output);
+    this.amp = ctx.createGain();
+    this.amp.gain.value = DRIVE_IN;
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = overdrive(30);
+    shaper.oversample = '2x';
+    const cabinet = filter(ctx, 'lowpass', 3000, 0.7), level = ctx.createGain();
+    level.gain.value = DRIVE_OUT;
+    this.amp.connect(shaper);
+    shaper.connect(cabinet);
+    cabinet.connect(level);
+    level.connect(this.input);
   }
 
   get playing(): boolean {
@@ -89,7 +115,10 @@ export class GeneratedMusic {
     const bars = st.chordBars ?? 1, chord = st.ch[Math.floor(this.bar / bars) % st.ch.length];
     const hit = (pattern: string): boolean => pattern[s] === 'x';
     const pad = st.voice === 'pad';
-    if (s === 0 && this.bar % bars === 0) {
+    if (st.chug && s % 2 === 0) {
+      // Eighth notes, accented on the beat.
+      chord.n.forEach(n => this.note('guitar', n, t, spb * 1.5, s % 4 === 0 ? 0.11 : 0.08));
+    } else if (!st.chug && s === 0 && this.bar % bars === 0) {
       const length = spb * 16 * bars;
       chord.n.forEach((n, i) => this.note(st.voice, n, t + i * (pad ? 0 : 0.012 + Math.random() * 0.01), length * (pad ? 1.05 : 0.9), pad ? 0.07 : 0.1));
     }
@@ -112,7 +141,7 @@ export class GeneratedMusic {
       else if (Math.random() < st.mel) {
         const length = pick([2, 3, 4, 6]);
         this.melodyLeft = length / 2;
-        this.note(pad ? 'bell' : st.voice === 'piano' ? 'piano' : 'keys', pick(st.scale), t, spb * length, 0.085);
+        this.note(st.chug ? 'lead' : pad ? 'bell' : st.voice === 'piano' ? 'piano' : 'keys', pick(st.scale), t, spb * length, st.chug ? 0.07 : 0.085);
       }
     }
   }
@@ -154,6 +183,15 @@ export class GeneratedMusic {
       tone.frequency.value = 1300;
       attack = 0.4;
       release = 1.2;
+    } else if (voice === 'guitar') {
+      parts = [oscillator('sawtooth', f, 0.5, -7), oscillator('sawtooth', f, 0.5, 7)];
+      tone.frequency.value = 2200;
+      release = 0.08;
+    } else if (voice === 'lead') {
+      parts = [oscillator('sawtooth', f, 0.5), oscillator('square', f * 2, 0.15)];
+      tone.frequency.value = 2600;
+      attack = 0.02;
+      release = 0.5;
     } else if (voice === 'pluck') {
       parts = [oscillator('square', f, 0.3), oscillator('sawtooth', f, 0.2)];
       tone.frequency.setValueAtTime(3200, t);
@@ -171,7 +209,7 @@ export class GeneratedMusic {
     }
     for (const [, og] of parts) og.connect(tone);
     tone.connect(g);
-    g.connect(this.input);
+    g.connect(voice === 'guitar' || voice === 'lead' ? this.amp : this.input);
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(vel, t + attack);
     if (voice === 'keys' || voice === 'piano' || voice === 'bell') g.gain.exponentialRampToValueAtTime(vel * 0.25, t + attack + Math.min(dur, 1.4));

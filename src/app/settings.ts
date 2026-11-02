@@ -83,7 +83,7 @@ function defaults(): Settings {
 }
 
 export function defaultMix(): Mix {
-  return { music: 0.55, rain: 0.55, engine: 0.35, wipers: 0.5, traffic: 0.3, wind: 0.2 };
+  return { music: 0.55, rain: 0.4, engine: 0.35, wipers: 0.5, traffic: 0.3, wind: 0.2 };
 }
 
 function sanitizeMix(raw: unknown): Mix | null {

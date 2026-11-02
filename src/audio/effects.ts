@@ -1,7 +1,7 @@
 import type { AudioEngine } from './audioEngine';
 import { filter, midiToHz } from './nodes';
 
-/** One-off sounds: the wiper blade, the phase chime and the key clicking between positions. */
+/** One-off sounds: the wiper blade, the phase chime, the key clicking between positions and the timer's buttons. */
 export class Effects {
   constructor(private readonly audio: AudioEngine) {}
 
@@ -53,6 +53,34 @@ export class Effects {
       o.start(at);
       o.stop(at + 2.3);
     });
+  }
+
+  /**
+   * A dashboard switch: a soft plastic click with a little body under it. Start sounds
+   * a touch higher than the others, so starting and stopping are told apart by ear.
+   */
+  press(start: boolean): void {
+    const graph = this.audio.graph;
+    if (!graph) return;
+    const { ctx, master, noise } = graph;
+    const t = ctx.currentTime;
+    const source = ctx.createBufferSource(), g = ctx.createGain();
+    source.buffer = noise.white;
+    g.gain.setValueAtTime(0.18, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.025);
+    source.connect(filter(ctx, 'bandpass', start ? 2600 : 1900, 1.5)).connect(g);
+    g.connect(master);
+    source.start(t, Math.random());
+    source.stop(t + 0.03);
+    const body = ctx.createOscillator(), bg = ctx.createGain();
+    body.frequency.setValueAtTime(start ? 520 : 380, t);
+    body.frequency.exponentialRampToValueAtTime(start ? 300 : 220, t + 0.05);
+    bg.gain.setValueAtTime(0.12, t);
+    bg.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    body.connect(bg);
+    bg.connect(master);
+    body.start(t);
+    body.stop(t + 0.08);
   }
 
   /** The key's detent clicking as it moves to another position. */

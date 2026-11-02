@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { pick, rand } from '../lib/math';
-import { BOX, BOX_L, PLANE, buildingGeometry, mesh } from '../scene/geometry';
+import { BOX, BOX_L, PLANE, PLANE_L, TREE_CONE, buildingGeometry, mesh } from '../scene/geometry';
 import { LAMP_SODIUM, MATERIALS, SIGN_MATERIALS, WINDOW_MATERIALS } from '../scene/materials';
-import { CHUNK_LENGTH, addGuardrail, addLamp, addRoadBase } from './parts';
+import { CHUNK_LENGTH, Instances, addGuardrail, addLamp, addRoadBase, addShoulder, addVariant, addWater } from './parts';
 import type { Chunk, RouteDefinition } from './types';
 
 const CH = CHUNK_LENGTH;
@@ -63,21 +63,83 @@ function addGantry(chunk: Chunk): void {
   for (const x of [-0.4, 3.2]) chunk.labels.push(mesh(PLANE, pick(SIGN_MATERIALS), x, 6.1, -29.8, 3.4, 1.7, 1, o));
 }
 
-/** An open dual carriageway with a median barrier, gantries, overpasses and the odd tunnel. */
+/** Either side of the road beyond the guardrails, by distance out: negative is our side. */
+const sideX = (side: number, out: number): number => (side < 0 ? LEFT - out : RIGHT + out);
+
+/** Paved shoulders `width` wide outside both carriageways, with guardrails along their outer edge or marker posts. */
+function addEdges(o: THREE.Object3D, width: number, guardrails: boolean): void {
+  for (const side of [-1, 1]) {
+    if (width > 0.5) addShoulder(o, sideX(side, 0), sideX(side, width));
+    if (guardrails) addGuardrail(o, sideX(side, width));
+    else for (const z of [-5, -25]) mesh(BOX, M.paint, sideX(side, width + 0.3), 0.5, z, 0.12, 1, 0.12, o);
+  }
+}
+
+/** Sheds and warehouses with lit windows, and a chimney now and then. */
+function industrial(chunk: Chunk, o: THREE.Object3D): void {
+  addEdges(o, 0.45, true);
+  for (const side of [-1, 1]) {
+    if (Math.random() < 0.3) continue;
+    const w = rand(20, 50), h = rand(6, 14), d = rand(15, 30);
+    const shed = mesh(buildingGeometry(w, h, d), WINDOW_MATERIALS[0], sideX(side, rand(25, 60) + w / 2), h / 2, -20, 1, 1, 1, o);
+    chunk.openAir.push(shed);
+  }
+  if (Math.random() < 0.3) {
+    const x = sideX(pick([-1, 1]), rand(40, 70));
+    mesh(BOX, M.concrete, x, 15, -rand(5, 35), 2.4, 30, 2.4, o);
+    mesh(BOX, M.reflector, x, 30.4, -20, 0.5, 0.5, 0.5, o);
+  }
+}
+
+/** Dark pines crowding both sides. */
+function forest(o: THREE.Object3D): void {
+  addEdges(o, 0.45, true);
+  const pines = new Instances(TREE_CONE, M.tree, 26, o);
+  for (let k = 0; k < 26; k++) {
+    const size = rand(1.2, 2.6);
+    // Set out by the cone's own radius, so no branch hangs over the guardrail.
+    pines.add(sideX(k % 2 ? 1 : -1, rand(3, 40) + 1.7 * size), 2.5 * size - 0.2, -rand(0, CH), size, size, size, rand(0, Math.PI));
+  }
+}
+
+/** Sand to the horizon, flat-topped mesas far off, scrub and a line of telephone poles. */
+function desert(o: THREE.Object3D): void {
+  addEdges(o, 3.2, false);
+  for (const side of [-1, 1]) mesh(PLANE_L, M.sand, sideX(side, 60), -0.1, -CH / 2, 116, CH, 1, o).rotation.x = -Math.PI / 2;
+  if (Math.random() < 0.5) {
+    const side = pick([-1, 1]), h = rand(14, 30);
+    mesh(BOX, M.cliff, sideX(side, rand(90, 160)), h / 2 - 0.2, -rand(0, CH), rand(30, 70), h, rand(20, 36), o).rotation.y = rand(0, 1);
+  }
+  const scrub = new Instances(TREE_CONE, M.tree, 10, o);
+  for (let k = 0; k < 10; k++) {
+    const size = rand(0.15, 0.35);
+    scrub.add(sideX(k % 2 ? 1 : -1, rand(5, 50)), 0.3, -rand(0, CH), size * 2, size, size * 2);
+  }
+  for (const z of [-10, -30]) {
+    mesh(BOX, M.trunk, sideX(-1, 6), 4, z, 0.25, 8, 0.25, o);
+    mesh(BOX, M.trunk, sideX(-1, 6), 7.4, z, 1.8, 0.15, 0.15, o);
+  }
+}
+
+/** A causeway: water out to the horizon on both sides. */
+function causeway(o: THREE.Object3D): void {
+  addEdges(o, 1.6, true);
+  addWater(o, LEFT - 2.2, LEFT - 400, -0.12);
+  addWater(o, RIGHT + 2.2, RIGHT + 400, -0.12);
+}
+
+/** A dual carriageway with a median barrier, gantries, overpasses and the odd tunnel, through industry, forest, desert or across water. */
 function buildChunk(chunk: Chunk, i: number): void {
   const g = chunk.group;
   addRoadBase(chunk, LEFT, RIGHT, [-2.05, 4.85, 7.75, 14.85], [1.4, 11.2]);
   mesh(BOX_L, M.concrete, MEDIAN, 0.45, -CH / 2, 0.5, 0.9, CH, g);
-  addGuardrail(chunk, LEFT - 0.45);
-  addGuardrail(chunk, RIGHT + 0.4);
   chunk.openAir.push(addLamp(chunk, MEDIAN, -20, -3.2, 11, LAMP_SODIUM), addLamp(chunk, MEDIAN, -20, 3.2, 11, LAMP_SODIUM));
   if (i % 4 === 1) addGantry(chunk);
   if (i % 5 === 3) addOverpass(chunk);
-  if (i % 2) {
-    const w = rand(20, 50), h = rand(6, 14), d = rand(15, 30);
-    const shed = mesh(buildingGeometry(w, h, d), WINDOW_MATERIALS[0], (Math.random() < 0.5 ? -1 : 1) * rand(45, 90) + CENTRE, h / 2, -20, 1, 1, 1, g);
-    chunk.openAir.push(shed);
-  }
+  industrial(chunk, addVariant(chunk));
+  forest(addVariant(chunk));
+  desert(addVariant(chunk));
+  causeway(addVariant(chunk));
   addTunnel(chunk);
 }
 

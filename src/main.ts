@@ -20,8 +20,8 @@ import { Backdrop } from './scene/backdrop';
 import { ChunkPool, shelterAt } from './scene/chunkPool';
 import { Cockpit } from './scene/cockpit/cockpit';
 import { Drive } from './scene/drive';
-import { createLights, setLightsSide } from './scene/lights';
-import { NEON_SIGN_MATERIALS, SIGN_MATERIALS } from './scene/materials';
+import { createLights, placeHeadlights } from './scene/lights';
+import { CITY_NEON_MATERIALS, NEON_SIGN_MATERIALS, SIGN_MATERIALS } from './scene/materials';
 import { PostFx } from './scene/postfx';
 import { RoadSurface } from './scene/roadSurface';
 import { Stage } from './scene/stage';
@@ -59,7 +59,7 @@ const engine = new CarEngine();
 const stage = new Stage($<HTMLCanvasElement>('#gl'));
 const postfx = new PostFx(stage);
 // Signs are picked at random as the road is rebuilt; uploading them all now means none stalls a frame later.
-for (const { map } of [...SIGN_MATERIALS, ...NEON_SIGN_MATERIALS]) if (map) stage.renderer.initTexture(map);
+for (const { map } of [...SIGN_MATERIALS, ...NEON_SIGN_MATERIALS, ...CITY_NEON_MATERIALS]) if (map) stage.renderer.initTexture(map);
 const lights = createLights(stage.scene);
 const cockpit = new Cockpit(stage.camera, route.name);
 const backdrop = new Backdrop(stage.scene, route);
@@ -136,6 +136,9 @@ const topBar = $('#top');
 stage.onResize(() => stage.setMirrorTop(topBar.getBoundingClientRect().bottom + MIRROR_GAP_PX));
 const idle = createIdleFade(() => timer.running && !surface.isOpen());
 
+// The timer's buttons click like dashboard switches. The HUD has already toggled the timer by now.
+$('#btnPlay').addEventListener('click', () => effects.press(timer.running));
+for (const id of ['#btnReset', '#btnSkip']) $(id).addEventListener('click', () => effects.press(false));
 $('#btnSkip').addEventListener('click', () => {
   timer.skip();
   toast(`Skipped to ${phaseName(timer.phase).toLowerCase()}`);
@@ -143,7 +146,9 @@ $('#btnSkip').addEventListener('click', () => {
 $('#btnFull').addEventListener('click', () => void toggleFullscreen());
 bindShortcuts({
   togglePlay: () => {
-    if (engine.running) timer.toggle();
+    if (!engine.running) return;
+    timer.toggle();
+    effects.press(timer.running);
   },
   toggleMute: () => {
     settings.update({ muted: !settings.value.muted });
@@ -229,7 +234,6 @@ function applyDriveSide(): void {
   traffic.setSide(side);
   cockpit.setSide(side);
   roadSurface.setSide(side);
-  setLightsSide(lights, side);
 }
 settings.onChange(applyDriveSide);
 applyDriveSide();
@@ -247,6 +251,9 @@ function simulate(dt: number): void {
   stage.updateFraming(dt, s.reduced);
   const ignitionOn = engine.state === 'on' || engine.state === 'running';
   environment.update(dt, s.tod, s.weather, ignitionOn);
+  const side = s.driveSide === 'right' ? -1 : 1;
+  drive.laneOffset = traffic.ownOffset * side;
+  placeHeadlights(lights, side, drive.laneOffset);
   drive.update(dt, engine.state, s.breakSlow && timer.phase !== 'focus', s.reduced, environment.lampLevel);
   traffic.update(dt, drive.speed, environment.headlightLevel);
   cockpit.update(dt, drive.speed, drive.bend, drive.clock);

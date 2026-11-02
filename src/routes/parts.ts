@@ -34,15 +34,48 @@ export function addRoadBase(chunk: Chunk, left: number, right: number, edges: nu
 }
 
 /** A steel guardrail on posts every 4 m. */
-export function addGuardrail(chunk: Chunk, x: number): void {
-  mesh(BOX_L, MATERIALS.metal, x, 0.65, -CHUNK_LENGTH / 2, 0.08, 0.32, CHUNK_LENGTH, chunk.group);
+export function addGuardrail(parent: THREE.Object3D, x: number): void {
+  mesh(BOX_L, MATERIALS.metal, x, 0.65, -CHUNK_LENGTH / 2, 0.08, 0.32, CHUNK_LENGTH, parent);
   const posts = new THREE.InstancedMesh(BOX, MATERIALS.metal, CHUNK_LENGTH / 4);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(0.1, 0.7, 0.1), p = new THREE.Vector3();
   for (let k = 0; k < posts.count; k++) posts.setMatrixAt(k, m.compose(p.set(x - 0.02, 0.35, -k * 4), q, s));
-  chunk.group.add(posts);
+  parent.add(posts);
 }
 
-/** A grass strip beside the road, just under its surface. */
-export function addVerge(chunk: Chunk, x: number, width: number): void {
-  mesh(PLANE_L, MATERIALS.grass, x, -0.01, -CHUNK_LENGTH / 2, width, CHUNK_LENGTH, 1, chunk.group).rotation.x = -Math.PI / 2;
+/** A paved strip beside the road from x0 to x1, so the road looks wider there. */
+export function addShoulder(parent: THREE.Object3D, x0: number, x1: number): void {
+  mesh(PLANE_L, MATERIALS.road, (x0 + x1) / 2, -0.005, -CHUNK_LENGTH / 2, Math.abs(x1 - x0), CHUNK_LENGTH, 1, parent).rotation.x = -Math.PI / 2;
+}
+
+/** Up to `max` instances of one shape, placed with `add` calls; any left over aren't drawn. */
+export class Instances {
+  readonly mesh: THREE.InstancedMesh;
+  private readonly m = new THREE.Matrix4();
+  private readonly q = new THREE.Quaternion();
+  private readonly e = new THREE.Euler();
+
+  constructor(geometry: THREE.BufferGeometry, material: THREE.Material, max: number, parent: THREE.Object3D) {
+    this.mesh = new THREE.InstancedMesh(geometry, material, max);
+    this.mesh.count = 0;
+    parent.add(this.mesh);
+  }
+
+  add(x: number, y: number, z: number, sx: number, sy: number, sz: number, turn = 0, color?: THREE.Color): void {
+    const i = this.mesh.count++;
+    this.mesh.setMatrixAt(i, this.m.compose(new THREE.Vector3(x, y, z), this.q.setFromEuler(this.e.set(0, turn, 0)), new THREE.Vector3(sx, sy, sz)));
+    if (color) this.mesh.setColorAt(i, color);
+  }
+}
+
+/** One kind of scenery for a chunk; the pool shows one at a time, in stretches. */
+export function addVariant(chunk: Chunk): THREE.Group {
+  const g = new THREE.Group();
+  chunk.group.add(g);
+  chunk.variants.push(g);
+  return g;
+}
+
+/** A flat stretch of water from x0 to x1 (either way round), just under the ground at y. */
+export function addWater(parent: THREE.Object3D, x0: number, x1: number, y: number): void {
+  mesh(PLANE_L, MATERIALS.water, (x0 + x1) / 2, y, -CHUNK_LENGTH / 2, Math.abs(x1 - x0), CHUNK_LENGTH, 1, parent).rotation.x = -Math.PI / 2;
 }
