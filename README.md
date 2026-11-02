@@ -26,7 +26,7 @@ npx playwright test --project=phone-portrait
 npx playwright test -g "wipers"
 ```
 
-The tests use a separate build (`npm run build:e2e`) that exposes scene state on `window.__drivey`; the public build doesn't include it. They run on every push, and a failure stops the deploy.
+The tests use a separate build (`npm run build:e2e`) that exposes scene state on `window.__drivey`; the public build doesn't include it. Every push to `main` runs the laptop Chromium setup on GitHub, and a failure stops the deploy. The phone and WebKit setups only run locally, so run the full `npm run test:e2e` before pushing.
 
 When adding a feature, add its test in `e2e/`, then break the feature on purpose to check that the test fails.
 

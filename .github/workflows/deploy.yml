@@ -25,8 +25,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npm run test:e2e
+      # Only the laptop Chromium setup runs here, to keep deploys quick; the full
+      # four-setup suite (phones and WebKit included) runs locally before each push.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- --project=laptop-chromium
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
