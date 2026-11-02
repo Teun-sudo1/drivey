@@ -89,7 +89,7 @@ export class Cockpit {
     this.gaugeScreen = gaugeScreen;
     this.screens = [gaugeScreen, this.lcdScreen, navScreen];
 
-    this.wheel.position.set(0, -0.47, -0.6);
+    this.wheel.position.set(0, -0.4, -0.6);
     this.wheel.rotation.x = -0.35;
     root.add(this.wheel);
     mesh(new THREE.TorusGeometry(0.2, 0.024, 12, 48), intA, 0, 0, 0, 1, 1, 1, this.wheel);

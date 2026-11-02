@@ -1,4 +1,5 @@
 import { advance, brightnessAt, expect, isPortrait, mirrorRect, openApp, openSceneTab, overlaps, test, textRect, update } from './support';
+import { GAUGE_LANDMARKS } from '../src/scene/cockpit/gauges';
 
 const rectOf = async (page: any, selector: string) => {
   const b = (await page.locator(selector).boundingBox())!;
@@ -77,6 +78,35 @@ test('the dashboard display is fully on screen in landscape', async ({ page }) =
   });
   expect(Math.min(...edges)).toBeGreaterThan(-1);
   expect(Math.max(...edges)).toBeLessThan(1);
+});
+
+test('the wheel frames the gauges without covering the dials or the speed', async ({ page }) => {
+  await openApp(page, { tod: 'day', weather: 'clear' });
+  await advance(page, 2);
+  await page.waitForFunction(() => window.__drivey.stage.settled);
+  const points = await page.evaluate(landmarks => {
+    const { cockpit, stage } = window.__drivey;
+    stage.camera.updateMatrixWorld(true);
+    const screen = cockpit.gaugeScreen, { width, height } = screen.geometry.parameters, map = screen.material.map.image;
+    return landmarks.map(({ x, y }: { x: number; y: number }) => {
+      const v = screen.localToWorld(stage.camera.position.clone().set((x / map.width - 0.5) * width, (0.5 - y / map.height) * height, 0)).project(stage.camera);
+      return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
+    });
+  }, GAUGE_LANDMARKS);
+  // Hold the readings still, so only the wheel differs between the two samples.
+  await page.evaluate(() => (window.__drivey.cockpit.gauges.draw = () => {}));
+  const { width, height } = page.viewportSize()!;
+  for (const p of points) {
+    expect(p.x).toBeGreaterThan(4);
+    expect(p.x).toBeLessThan(width - 4);
+    expect(p.y).toBeGreaterThan(4);
+    expect(p.y).toBeLessThan(height - 6);
+  }
+  const sample = () => Promise.all(points.map(p => brightnessAt(page, p.x, p.y, 3)));
+  const shown = await sample();
+  await page.evaluate(() => (window.__drivey.cockpit.wheel.visible = false));
+  const hidden = await sample();
+  shown.forEach((b, i) => expect(Math.abs(b - hidden[i]), `landmark ${i}`).toBeLessThan(1.5));
 });
 
 test('the gear lever shows between the radio and the wheel in landscape', async ({ page }) => {

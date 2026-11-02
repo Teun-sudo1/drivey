@@ -2,6 +2,9 @@ import { colorTexture, createCanvas } from '../../lib/canvas';
 import { clamp } from '../../lib/math';
 
 const W = 512, H = 168;
+/** Canvas points that must stay readable: the dials' hubs and lowest labels, and the speed in digits. */
+export const SPEED_DIGITS = { x: 256, y: 116 };
+export const GAUGE_LANDMARKS = [{ x: 150, y: 88 }, { x: 362, y: 88 }, { x: 116, y: 122 }, { x: 184, y: 122 }, { x: 328, y: 122 }, { x: 396, y: 122 }, SPEED_DIGITS];
 
 function dial(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, f: number, labels: string[], unit: string): void {
   const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
@@ -62,7 +65,8 @@ export function createGauges() {
       g.fillStyle = 'rgba(255,170,90,.8)';
       g.font = '18px "Share Tech Mono", monospace';
       g.textAlign = 'center';
-      g.fillText(String(Math.round(kmh)).padStart(3, ' '), 256, 150);
+      // Between the dials, where the screen's lower edge can't crop it.
+      g.fillText(String(Math.round(kmh)).padStart(3, ' '), SPEED_DIGITS.x, SPEED_DIGITS.y);
       texture.needsUpdate = true;
     }
   };
