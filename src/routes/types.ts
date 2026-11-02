@@ -29,6 +29,8 @@ export interface Chunk {
   labels: THREE.Mesh[];
   /** Scenery that would poke through a tunnel, hidden while the chunk is one. */
   openAir: THREE.Object3D[];
+  /** Alternative scenery for the same road; one shows at a time, for stretches of several chunks. */
+  variants: THREE.Object3D[];
   tunnel?: ChunkTunnel;
 }
 

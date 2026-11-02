@@ -10,11 +10,11 @@ async function startDriving(page: Page, settings: Record<string, unknown> = {}):
 }
 
 test.describe('sound', () => {
-  test('nothing makes a sound until the key is turned', async ({ page }) => {
+  test('nothing makes a sound until the first tap on the start screen', async ({ page }) => {
     await openParked(page);
-    await page.click('#btnGetIn');
+    await page.waitForTimeout(500);
     expect(await page.evaluate(() => window.__drivey.audio.graph)).toBeNull();
-    await page.locator('#ignition').click();
+    await page.click('#startTod button:has-text("Dusk")');
     await expect.poll(() => page.evaluate(() => window.__drivey.audio.graph?.ctx.state)).toBe('running');
   });
 
@@ -132,17 +132,21 @@ const faders = (page: Page): Promise<number[]> => page.evaluate(() => window.__d
 const sequencers = (page: Page) => page.evaluate(() => window.__drivey.player.decks.map((d: any) => d.music.playing));
 
 test.describe('music', () => {
-  test('beats start with the engine, made locally without a single network request', async ({ page }) => {
+  test('quiet beats play while setting up and come up with the engine, made without a single network request', async ({ page }) => {
     const outside: string[] = [];
     page.on('request', r => {
       if (!/^(http:\/\/localhost|blob:|data:)/.test(r.url())) outside.push(r.url());
     });
-    await openParked(page);
-    await page.click('#btnGetIn');
+    await openParked(page, { mix: { music: 0.6 } });
     expect(await page.evaluate(() => window.__drivey.player.playing)).toBe(false);
+    await page.click('#btnGetIn');
+    await expect.poll(async () => Math.max(...(await faders(page)))).toBeGreaterThan(0.9);
+    // A third of the mixer's level until the engine runs.
+    const music = () => page.evaluate(() => window.__drivey.audio.graph.channels.music.gain.value);
+    await expect.poll(music).toBeCloseTo(0.6 * 0.35, 2);
     await page.locator('#ignition').click();
     await expect.poll(() => page.evaluate(() => window.__drivey.engine.state)).toBe('running');
-    await expect.poll(async () => Math.max(...(await faders(page)))).toBeGreaterThan(0.9);
+    await expect.poll(music).toBeCloseTo(0.6, 2);
     expect((await sequencers(page)).filter(Boolean)).toHaveLength(1);
     await page.click('#btnPanel');
     await page.click('[data-tab="sound"]');

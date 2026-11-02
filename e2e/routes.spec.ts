@@ -100,8 +100,8 @@ test.describe('routes', () => {
     const after = await memory();
     // The city's towers are each a unique geometry, so a leak would add hundreds.
     expect(after.geometries).toBeLessThan(before.geometries + 20);
-    // Signs are picked at random, so one may still be on its first upload; a leaked skyline adds 8 a lap.
-    expect(after.textures).toBeLessThanOrEqual(before.textures + 4);
+    // Every sign is uploaded at startup, so nothing new should appear; a leaked skyline adds 8 a lap.
+    expect(after.textures).toBeLessThanOrEqual(before.textures);
     expect(await page.evaluate(() => window.__drivey.engine.state)).toBe('running');
     await expect(page.locator('#start')).toHaveClass(/gone/);
   });

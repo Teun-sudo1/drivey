@@ -21,6 +21,7 @@ import { ChunkPool, shelterAt } from './scene/chunkPool';
 import { Cockpit } from './scene/cockpit/cockpit';
 import { Drive } from './scene/drive';
 import { createLights, setLightsSide } from './scene/lights';
+import { NEON_SIGN_MATERIALS, SIGN_MATERIALS } from './scene/materials';
 import { PostFx } from './scene/postfx';
 import { RoadSurface } from './scene/roadSurface';
 import { Stage } from './scene/stage';
@@ -57,6 +58,8 @@ let route = ROUTES[settings.value.route];
 const engine = new CarEngine();
 const stage = new Stage($<HTMLCanvasElement>('#gl'));
 const postfx = new PostFx(stage);
+// Signs are picked at random as the road is rebuilt; uploading them all now means none stalls a frame later.
+for (const { map } of [...SIGN_MATERIALS, ...NEON_SIGN_MATERIALS]) if (map) stage.renderer.initTexture(map);
 const lights = createLights(stage.scene);
 const cockpit = new Cockpit(stage.camera, route.name);
 const backdrop = new Backdrop(stage.scene, route);
@@ -77,8 +80,8 @@ const ambience = new Ambience(audio);
 const effects = new Effects(audio);
 const player = new MusicPlayer(audio);
 windshield.onStroke(() => effects.swish());
-// Turning the key is the gesture that lets the browser make sound.
-for (const type of ['pointerdown', 'keydown'] as const) $('#ignition').addEventListener(type, () => audio.unlock());
+// Browsers only allow sound after a tap or key press, so the first one on the start screen
+// starts it: quiet music while setting up, then the key turn and the engine.
 engine.onChange(state => {
   if (state === 'acc' || state === 'on') effects.click();
 });
@@ -88,14 +91,19 @@ function applyMusic(): void {
   const s = settings.value;
   audio.setMuted(s.muted);
   player.setStyle(s.style);
-  const wanted = s.musicOn && engine.running;
+  const wanted = s.musicOn && audio.graph !== null;
   if (wanted !== player.playing) {
     if (wanted) player.play();
     else player.pause();
   }
 }
 settings.onChange(applyMusic);
-engine.onChange(applyMusic);
+for (const type of ['pointerdown', 'keydown'] as const) {
+  $('#start').addEventListener(type, () => {
+    audio.unlock();
+    applyMusic();
+  });
+}
 applyMusic();
 
 /* Timer */

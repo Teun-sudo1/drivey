@@ -24,6 +24,24 @@ export const test = base.extend<{ pageErrors: string[] }>({
   pageErrors: [
     async ({ page }, use) => {
       const errors: string[] = [];
+      // WebKit has no fake sound card, so test pages would play through the speakers. Everything
+      // still runs and can be measured; it just ends in a silent node instead of the real output.
+      await page.addInitScript(() => {
+        const real = Object.getOwnPropertyDescriptor(BaseAudioContext.prototype, 'destination')!.get!;
+        const silent = new WeakMap<BaseAudioContext, GainNode>();
+        Object.defineProperty(BaseAudioContext.prototype, 'destination', {
+          get(this: BaseAudioContext) {
+            let node = silent.get(this);
+            if (!node) {
+              node = this.createGain();
+              node.gain.value = 0;
+              node.connect(real.call(this));
+              silent.set(this, node);
+            }
+            return node;
+          }
+        });
+      });
       await page.route(url => !isLocal(url.href), route => route.abort('internetdisconnected'));
       page.on('pageerror', e => errors.push(e.message));
       page.on('console', m => {

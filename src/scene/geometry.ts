@@ -11,7 +11,30 @@ export const TREE_CONE = new THREE.ConeGeometry(1.7, 5, 7);
 /** A four-sided cone, turned to make a hipped roof. */
 export const ROOF_CONE = new THREE.ConeGeometry(5.7, 3, 4);
 
-const SHARED = new Set<THREE.BufferGeometry>([BOX, PLANE, PLANE_L, BOX_L, TREE_CONE, ROOF_CONE]);
+/** A palm trunk about 8.5 m tall, curving gently to one side. */
+export const PALM_TRUNK = mergeGeometries(
+  Array.from({ length: 6 }, (_, k) => new THREE.CylinderGeometry(0.15 - k * 0.012, 0.2 - k * 0.012, 1.5, 6).rotateZ(-0.05 * k).translate(0.04 * k * k, 0.7 + k * 1.4, 0))
+);
+/** Where the trunk ends, for the crown of fronds. */
+const PALM_TOP = new THREE.Vector3(0.04 * 25 + 0.05, 8.4, 0);
+
+/** Nine fronds rising from the crown and drooping, each narrowing to its tip. */
+export const PALM_FRONDS = mergeGeometries(
+  Array.from({ length: 9 }, (_, k) => {
+    const frond = new THREE.PlaneGeometry(1, 3.2, 1, 5).translate(0, 1.6, 0);
+    const pos = frond.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const along = pos.getY(i), across = pos.getX(i);
+      pos.setXYZ(i, along, 0.7 * along - 0.3 * along * along, across * (1 - along / 3.6));
+    }
+    const lift = k % 2 ? 0.25 : -0.1;
+    frond.rotateZ(lift).rotateY((k / 9) * Math.PI * 2 + k * 0.3).translate(PALM_TOP.x, PALM_TOP.y, PALM_TOP.z);
+    frond.computeVertexNormals();
+    return frond;
+  })
+);
+
+const SHARED = new Set<THREE.BufferGeometry>([BOX, PLANE, PLANE_L, BOX_L, TREE_CONE, ROOF_CONE, PALM_TRUNK, PALM_FRONDS]);
 
 /** Frees the GPU buffers of everything under root, except the shared geometries above. */
 export function disposeTree(root: THREE.Object3D): void {

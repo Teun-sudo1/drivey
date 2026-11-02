@@ -109,3 +109,30 @@ export function signTexture(txt: string, sub: string): THREE.CanvasTexture {
   ctx.fillText(sub, 128, 98);
   return colorTexture(canvas);
 }
+
+/** A neon word on a dark board, with a tube outline in the other colour. */
+export function neonSignTexture(word: string, color: THREE.Color): THREE.CanvasTexture {
+  const { canvas, ctx } = createCanvas(256, 128);
+  const tube = `#${color.getHexString()}`, trim = color.r > color.b ? '#3ff2ff' : '#ff3fa4';
+  ctx.fillStyle = '#0b0710';
+  ctx.fillRect(0, 0, 256, 128);
+  ctx.lineWidth = 4;
+  ctx.shadowBlur = 14;
+  ctx.shadowColor = trim;
+  ctx.strokeStyle = trim;
+  ctx.beginPath();
+  ctx.roundRect(10, 10, 236, 108, 18);
+  ctx.stroke();
+  ctx.shadowColor = tube;
+  ctx.fillStyle = '#fff';
+  ctx.font = `italic 600 ${word.length > 6 ? 36 : 46}px Inter, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowBlur = 22;
+  ctx.strokeStyle = tube;
+  ctx.lineWidth = 6;
+  ctx.strokeText(word, 128, 66);
+  ctx.shadowBlur = 6;
+  ctx.fillText(word, 128, 66);
+  return colorTexture(canvas);
+}

@@ -13,6 +13,8 @@ const TOP_SPEED = 28;
 const SWELL_EVERY = 1.5;
 /** The starter's chug: one beat per compression stroke. */
 const STARTER_BEAT_HZ = 9;
+/** Music on the start screen, as a share of the mixer's music level. */
+export const PARKED_MUSIC = 0.35;
 
 export interface AmbienceFrame {
   dt: number;
@@ -64,7 +66,8 @@ export class Ambience {
     for (const k of Object.keys(scene) as AmbientChannel[]) this.audio.setLevel(k, f.mix[k] * (f.follow ? scene[k] : k === 'engine' ? (f.engine === 'running' ? 1 : 0) : 1));
     // The starter belongs to the engine channel, but sounds before the engine runs.
     if (f.engine === 'cranking') this.audio.setLevel('engine', f.mix.engine);
-    this.audio.setLevel('music', f.mix.music);
+    // Quieter while parked on the start screen, coming up to the mixer's level once the engine runs.
+    this.audio.setLevel('music', f.mix.music * (f.engine === 'running' ? 1 : PARKED_MUSIC));
 
     const t = graph.ctx.currentTime;
     for (const [o, ratio] of this.engineOscillators) o.frequency.setTargetAtTime((28 + f.speed * 1.15) * ratio, t, 0.5);

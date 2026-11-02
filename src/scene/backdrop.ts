@@ -9,7 +9,9 @@ const SKYLINE_Y: Record<SkylineKind, number> = { city: 50, low: 62, hills: 62 };
 /** The coast's low skyline is turned so the town sits across the bay. */
 const COAST_SKYLINE_TURN = 2.2;
 const SHORE_LIGHTS = 300;
-const SEA_Y = -3;
+export const SEA_Y = -3;
+/** The water's own colour, which shows by day; at night it takes the fog's. */
+const SEA_DAY = new THREE.Color(0x1f7f96);
 
 function drawTowers(sil: CanvasRenderingContext2D, win: CanvasRenderingContext2D, kind: SkylineKind): void {
   let x = 0;
@@ -161,7 +163,7 @@ export class Backdrop {
       this.skyline.windows.opacity = visibility * THREE.MathUtils.clamp(win, 0, 1);
     }
     this.stars.material.opacity = star * 0.9;
-    (this.sea.material as THREE.MeshStandardMaterial).color.copy(fogColor).multiplyScalar(0.35);
+    (this.sea.material as THREE.MeshStandardMaterial).color.copy(fogColor).multiplyScalar(0.35).lerp(SEA_DAY, (1 - THREE.MathUtils.clamp(win, 0, 1)) * 0.85 * visibility);
     this.shoreLights.material.opacity = THREE.MathUtils.clamp(win, 0, 1) * THREE.MathUtils.clamp(1 - (fogDensity - 0.004) * 30, 0, 1);
   }
 }

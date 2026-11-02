@@ -62,7 +62,7 @@ export function createSoundPanel(settings: SettingsStore, player: MusicPlayer): 
   const title = $('#npTitle'), detail = $('#npDetail'), musicButton = $<HTMLButtonElement>('#btnMusic');
   const renderNowPlaying = (): void => {
     title.textContent = `${STYLES[player.style].name} beats`;
-    detail.textContent = `Variation ${player.variation} · ${!settings.value.musicOn ? 'switched off' : player.playing ? 'playing' : 'starts with the engine'}`;
+    detail.textContent = `Variation ${player.variation} · ${!settings.value.musicOn ? 'switched off' : player.playing ? 'playing' : 'starts at your first tap'}`;
     musicButton.setAttribute('aria-label', settings.value.musicOn ? 'Pause music' : 'Play music');
     musicButton.querySelector('path')!.setAttribute('d', settings.value.musicOn ? 'M8 5v14M16 5v14' : 'M8 5v14l11-7z');
   };

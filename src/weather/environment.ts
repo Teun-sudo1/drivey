@@ -3,7 +3,7 @@ import { damp, lerp } from '../lib/math';
 import type { Backdrop } from '../scene/backdrop';
 import type { Cockpit } from '../scene/cockpit/cockpit';
 import type { SceneLights } from '../scene/lights';
-import { BUILDING_DAY_COLORS, BUILDING_NIGHT_COLOR, LAMP_KINDS, MATERIALS, SIGN_MATERIALS, WINDOW_MATERIALS } from '../scene/materials';
+import { BUILDING_DAY_COLORS, BUILDING_NIGHT_COLOR, LAMP_KINDS, MATERIALS, NEON_SIGN_MATERIALS, SIGN_MATERIALS, WINDOW_MATERIALS } from '../scene/materials';
 import type { PostFx } from '../scene/postfx';
 import type { Stage } from '../scene/stage';
 import type { Particles } from './particles';
@@ -50,7 +50,10 @@ const SNOWED: readonly (readonly [THREE.MeshStandardMaterial, THREE.Color, numbe
   [MATERIALS.grass, MATERIALS.grass.color.clone(), 0.85],
   [MATERIALS.roof, MATERIALS.roof.color.clone(), 0.8],
   [MATERIALS.rock, MATERIALS.rock.color.clone(), 0.5],
-  [MATERIALS.tree, MATERIALS.tree.color.clone(), 0.35]
+  [MATERIALS.tree, MATERIALS.tree.color.clone(), 0.35],
+  [MATERIALS.sand, MATERIALS.sand.color.clone(), 0.8],
+  [MATERIALS.cliff, MATERIALS.cliff.color.clone(), 0.5],
+  [MATERIALS.palmLeaf, MATERIALS.palmLeaf.color.clone(), 0.3]
 ];
 
 /** Eases the whole scene towards the selected time of day and weather. */
@@ -145,6 +148,9 @@ export class Environment {
       m.roughness = lerp(0.5, 0.85, daylight);
     });
     for (const m of SIGN_MATERIALS) m.emissiveIntensity = 0.05 + 0.3 * env.lamp;
+    // Neon reads as pale tubes by day and glows into the bloom at night.
+    MATERIALS.neon.color.setScalar(0.45 + 1.4 * env.lamp);
+    for (const m of NEON_SIGN_MATERIALS) m.color.setScalar(0.5 + 1.1 * env.lamp);
     MATERIALS.under.color.setRGB(1, 0.85, 0.63).multiplyScalar(0.15 + 1.1 * env.lamp);
     for (const m of LAMP_KINDS.values()) {
       m.head.color.copy(m.base).multiplyScalar(0.15 + 2.85 * env.lamp);

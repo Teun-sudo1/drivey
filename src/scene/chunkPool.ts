@@ -11,6 +11,8 @@ const TUNNEL_CHANCE = 0.08;
 const TUNNEL_CHUNKS = [3, 5] as const;
 /** Open road between two tunnels, in chunks. */
 const MIN_TUNNEL_GAP = 8;
+/** How many chunks one kind of scenery lasts before the road moves on to another. */
+const VARIANT_STRETCH = [3, 7] as const;
 /** How far in from a portal the tunnel fully shelters the car, in metres. */
 const SHELTER_RAMP = 6;
 
@@ -46,6 +48,8 @@ export class ChunkPool {
   private side = 1;
   private tunnelLeft = 0;
   private sinceTunnel = 0;
+  private variant = 0;
+  private variantLeft = 0;
 
   constructor(private readonly scene: THREE.Scene, route: RouteDefinition) {
     this.setRoute(route);
@@ -61,8 +65,9 @@ export class ChunkPool {
     this.tunnelLeft = 0;
     // The road the car starts on is open, so a tunnel can only appear far ahead.
     this.sinceTunnel = 0;
+    this.variantLeft = 0;
     for (let i = 0; i < CHUNK_COUNT; i++) {
-      const chunk: Chunk = { group: new THREE.Group(), lamps: [], extras: [], buildings: [], labels: [], openAir: [] };
+      const chunk: Chunk = { group: new THREE.Group(), lamps: [], extras: [], buildings: [], labels: [], openAir: [], variants: [] };
       route.buildChunk(chunk, i);
       // Buildings get new materials, signs flip with the driving side and some scenery hides in tunnels.
       mergeStatic(chunk.group, new Set([...chunk.buildings, ...chunk.labels, ...chunk.openAir]));
@@ -134,6 +139,18 @@ export class ChunkPool {
     return 'entrance';
   }
 
+  /** Which scenery the next chunk shows: the same as the last until its stretch runs out, then another. */
+  private nextVariant(count: number): number {
+    if (this.variantLeft > 0) {
+      this.variantLeft--;
+      return this.variant;
+    }
+    const other = Math.floor(Math.random() * (count - 1));
+    this.variant = count < 2 ? 0 : other >= this.variant ? other + 1 : other;
+    this.variantLeft = Math.round(rand(...VARIANT_STRETCH)) - 1;
+    return this.variant;
+  }
+
   private refresh(chunk: Chunk, recycled: boolean): void {
     const stretch = recycled && chunk.tunnel ? this.nextStretch() : 'open';
     const tunnel = stretch !== 'open';
@@ -143,6 +160,10 @@ export class ChunkPool {
     }
     for (const extra of chunk.extras) extra.object.visible = !tunnel && Math.random() < extra.probability;
     for (const object of chunk.openAir) object.visible = !tunnel;
+    if (chunk.variants.length) {
+      const shown = this.nextVariant(chunk.variants.length);
+      chunk.variants.forEach((v, i) => (v.visible = !tunnel && i === shown));
+    }
     for (const building of chunk.buildings) {
       building.material = pick(WINDOW_MATERIALS);
       building.visible = Math.random() < 0.9;

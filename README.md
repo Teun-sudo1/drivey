@@ -28,7 +28,7 @@ npx playwright test -g "wipers"
 
 The full run takes about 2½ minutes on six parallel browsers.
 
-The tests use a separate build (`npm run build:e2e`) that exposes scene state on `window.__drivey`; the public build doesn't include it. GitHub doesn't run the browser tests, so deploys take about a minute: run the full `npm run test:e2e` locally and only push when it passes.
+The test browsers send all sound to a muted node, so running them is silent. The tests use a separate build (`npm run build:e2e`) that exposes scene state on `window.__drivey`; the public build doesn't include it. GitHub doesn't run the browser tests, so deploys take about a minute: run the full `npm run test:e2e` locally and only push when it passes.
 
 When adding a feature, add its test in `e2e/`, then break the feature on purpose to check that the test fails.
 
@@ -55,15 +55,15 @@ Pick a route on the start screen, or switch mid-drive under Settings › Scene:
 | Route | Road | Traffic |
 | --- | --- | --- |
 | City expressway | Elevated, between towers, with signs and overpasses | Two lanes our way, no oncoming |
-| Coastal road | Along a cliff, sea on our side, distant shore lights | One lane each way |
+| Coastal road | 80s style: a beach with palms, lifeguard huts and umbrellas down to the sea on our side; on the other, stretches of sandstone cliffs, neon-lit pastel motels, or palm groves and dunes | One lane each way |
 | Highway | Dual carriageway with gantries, overpasses and tunnels | Two lanes each way, with overtaking |
 | Countryside | Narrow lane through fields, trees and farmhouses | One lane each way, light |
 
-A route is a `RouteDefinition` in `src/routes/`: a function that fills a 40 m chunk of road, plus its speed, curviness, traffic lanes, distant scenery and the lamps seen in the mirror. Text in a chunk goes in `chunk.labels` so it stays readable when driving on the right. To add a route, write one and add it to `ROUTES` in `src/routes/index.ts`.
+A route is a `RouteDefinition` in `src/routes/`: a function that fills a 40 m chunk of road, plus its speed, curviness, traffic lanes, distant scenery and the lamps seen in the mirror. Text in a chunk goes in `chunk.labels` so it stays readable when driving on the right. Scenery that should change along the way goes in `chunk.variants`: one shows at a time, in stretches of three to seven chunks. To add a route, write one and add it to `ROUTES` in `src/routes/index.ts`.
 
 ## Music
 
-Music is lofi made live in the browser from oscillators and noise: drums, bass, chords and a sparse melody, with reverb and vinyl crackle. It needs no internet, plays no ads, and starts when the engine does. Under Settings › Sound, pick a style (Chillhop, Jazzy, Ambient, Synthwave, Rainy café); "next" crossfades to a fresh variation in another key. The patterns for each style are in `src/music/styles.ts`.
+Music is lofi made live in the browser from oscillators and noise: drums, bass, chords and a sparse melody, with reverb and vinyl crackle. It needs no internet and plays no ads. Browsers only allow sound after a tap, so it starts quietly at the first tap on the start screen and comes up to full level once the engine runs. Under Settings › Sound, pick a style (Chillhop, Jazzy, Ambient, Synthwave, Rainy café); "next" crossfades to a fresh variation in another key. The patterns for each style are in `src/music/styles.ts`.
 
 ## Ambient sound
 
