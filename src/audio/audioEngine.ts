@@ -6,8 +6,10 @@ export type Mix = Record<Channel, number>;
 
 /** How quickly a level change is eased in, in seconds. */
 const LEVEL_EASE = 0.4;
-/** Time constant of the fade as the page closes: a few milliseconds, which is all a closing page gets. */
-const CLOSE_FADE = 0.004;
+/** Time constant of the fade as the page closes: silent within about 50 ms. */
+const CLOSE_FADE = 0.01;
+/** A page that hasn't closed this long after it started to is staying open. */
+const STILL_OPEN_MS = 1500;
 
 export interface AudioGraph {
   readonly ctx: AudioContext;
@@ -25,6 +27,7 @@ export interface AudioGraph {
 export class AudioEngine {
   graph: AudioGraph | null = null;
   private muted = false;
+  private restoreTimer = 0;
   private readonly readyListeners: ((graph: AudioGraph) => void)[] = [];
 
   /** `beforeStart` runs once, inside the first gesture, just before the context is made. */
@@ -61,8 +64,17 @@ export class AudioEngine {
     })) as Record<Channel, GainNode>;
     const noise = { white: noiseBuffer(ctx, 'white'), brown: noiseBuffer(ctx, 'brown'), crackle: noiseBuffer(ctx, 'crackle') };
     this.graph = { ctx, master, channels, noise };
-    // Closing the tab cuts the sound mid-wave, which clicks; a fade as it starts closing ends it at silence.
-    addEventListener('pagehide', () => master.gain.setTargetAtTime(0, ctx.currentTime, CLOSE_FADE));
+    // Closing the tab cuts the sound mid-wave, which clicks. The fade starts at beforeunload, the
+    // earliest sign of closing, so there's time for it; pagehide catches closes that skip it.
+    const fadeOut = (): void => {
+      master.gain.cancelScheduledValues(ctx.currentTime);
+      master.gain.setTargetAtTime(0, ctx.currentTime, CLOSE_FADE);
+      // Still here a moment later, so it wasn't closing after all (a download link, say).
+      clearTimeout(this.restoreTimer);
+      this.restoreTimer = window.setTimeout(() => this.setMuted(this.muted), STILL_OPEN_MS);
+    };
+    addEventListener('beforeunload', fadeOut);
+    addEventListener('pagehide', fadeOut);
     // Coming back from the browser's back-forward cache.
     addEventListener('pageshow', e => {
       if (e.persisted) this.setMuted(this.muted);

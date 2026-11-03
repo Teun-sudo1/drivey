@@ -334,6 +334,7 @@ function simulate(dt: number): void {
   placeHeadlights(lights, side, drive.laneOffset);
   drive.update(dt, engine.state, s.breakSlow && timer.phase !== 'focus', s.reduced, environment.lampLevel, resting ? pool.restStopDistance() : null);
   traffic.update(dt, drive.speed, environment.headlightLevel);
+  cockpit.setSignal(traffic.ownSignal);
   cockpit.update(dt, drive.speed, drive.bend, drive.clock);
   const shelters = pool.shelters();
   // Nothing falls inside a tunnel; the camera sits at z = 0.

@@ -25,6 +25,8 @@ const PILLAR_WIDTH = 0.11;
 /** The roof light's brightness, and how quickly it fades like an old bulb. */
 const CABIN_LIGHT = 7;
 const CABIN_FADE_RATE = 2.5;
+/** Indicator flashes per second. */
+const BLINK_HZ = 1.5;
 /** Each A-pillar's foot and head, and which way is out of the car. */
 const PILLAR_ENDS: [THREE.Vector3, THREE.Vector3, number][] = [
   [new THREE.Vector3(-1.25, -0.47, -1.38), new THREE.Vector3(-0.98, 0.5, -0.78), -1],
@@ -48,6 +50,9 @@ export class Cockpit {
   readonly dashLight = new THREE.PointLight(0xff9a50, 0.1, 0.8, 2);
   // Short range: it lights the interior but must not reach the road, 1.77 below it.
   readonly passLight = new THREE.PointLight(0xffffff, 0, 1.7, 1.5);
+  /** The lit indicator in each door mirror's outer end: towards lower lane numbers, then higher. */
+  private readonly blinkers: [THREE.Mesh, THREE.Mesh];
+  private signal = 0;
   /** The roof light, on while the driver settles in; short range, so it stays off the road. */
   readonly cabinLight = new THREE.PointLight(0xffd6a0, 0, 1.5, 1.5);
   private cabinLevel = 0;
@@ -124,6 +129,7 @@ export class Cockpit {
 
     this.gearLever = this.addGearLever(root, intA, intB);
     this.addCabin(cabin, intA, intB);
+    this.blinkers = this.addSideMirrors(cabin, root, intB);
     mergeStatic(cabin);
 
     root.add(this.roof);
@@ -181,6 +187,11 @@ export class Cockpit {
     this.gaugeScreen.scale.set(scale * this.side, scale, 1);
   }
 
+  /** Which way the indicator is on, as Traffic.ownSignal gives it; it blinks in that side's door mirror. */
+  setSignal(direction: number): void {
+    this.signal = direction;
+  }
+
   setNavLoading(on: boolean): void {
     this.navLoading = on;
     this.navTimer = NAV_INTERVAL;
@@ -203,6 +214,9 @@ export class Cockpit {
 
   update(dt: number, speed: number, bend: number, clock: number): void {
     this.mirror.update(dt, speed, bend);
+    const blinkOn = this.signal !== 0 && (clock * BLINK_HZ) % 1 < 0.55;
+    this.blinkers[0].visible = blinkOn && this.signal < 0;
+    this.blinkers[1].visible = blinkOn && this.signal > 0;
     this.cabinLight.intensity = lerp(this.cabinLight.intensity, this.cabinLevel, damp(CABIN_FADE_RATE, dt));
     const power = lerp(this.power, this.engine === 'off' ? 0 : 1, damp(SCREEN_POWER_RATE, dt));
     const navPower = lerp(this.navPower, this.navLoading ? 1 : power, damp(SCREEN_POWER_RATE, dt));
@@ -284,6 +298,23 @@ export class Cockpit {
     mesh(BOX, chrome, -0.73, -0.56, -0.936, 0.07, 0.014, 0.01, cabin);
     mesh(BOX, trim, -1.16, -0.53, -0.944, 0.16, 0.07, 0.012, cabin);
     for (let i = 0; i < 3; i++) mesh(BOX, panel, -1.16, -0.552 + i * 0.022, -0.936, 0.15, 0.006, 0.006, cabin);
+  }
+
+  /** A mirror on each door, just beyond the pillar's foot, angled back at the driver, with an indicator at its outer end. */
+  private addSideMirrors(cabin: THREE.Group, root: THREE.Group, housing: THREE.Material): [THREE.Mesh, THREE.Mesh] {
+    // Shows a dim sky, as a mirror does even at night, so it reads as glass rather than more trim.
+    const glass = new THREE.MeshBasicMaterial({ color: 0x2c3544 });
+    const lit = new THREE.MeshBasicMaterial({ color: 0xffa424, toneMapped: false });
+    const lights = PILLAR_ENDS.map(([foot, , outward]) => {
+      const x = foot.x + outward * 0.2, y = foot.y + 0.1, z = foot.z + 0.12, yaw = -outward * 0.35;
+      mesh(BOX, housing, x, y, z, 0.22, 0.12, 0.07, cabin).rotation.y = yaw;
+      mesh(PLANE, glass, x - outward * 0.005, y, z + 0.037, 0.19, 0.095, 1, cabin).rotation.y = yaw;
+      const light = mesh(BOX, lit, x + outward * 0.1 * Math.cos(yaw), y, z - outward * 0.1 * Math.sin(yaw), 0.03, 0.07, 0.075, root);
+      light.rotation.y = yaw;
+      light.visible = false;
+      return light;
+    });
+    return [lights[0], lights[1]];
   }
 
   /** Rod, rubber boot and knob, leaning back towards the driver from the console. */

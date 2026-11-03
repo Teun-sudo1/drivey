@@ -7,10 +7,13 @@ import { CAR_GLOWS, CAR_LENGTH, TRUCK_LENGTH, makeVehicle } from './cars';
 
 const TRUCK_SHARE = 0.15;
 const LANE_CHANGE_SECONDS = 3;
-const LANE_CHANGE_EVERY = [6, 18] as const;
-/** How often our own car moves over on a multi-lane road, and how long it takes. */
-const OWN_CHANGE_EVERY = [40, 90] as const;
+/** How often a driver looks again at whether to overtake or move back in. */
+const LANE_DECIDE_EVERY = [0.6, 1.4] as const;
+/** A slower vehicle closer than this ahead, in the kerb lane, is worth overtaking. */
+const OVERTAKE_LOOK = 45;
+/** How long our own lane change takes, and how long we signal before it. */
 const OWN_CHANGE_SECONDS = 4;
+const OWN_SIGNAL_SECONDS = 1.5;
 /** We only move over above this speed, with this much room in the lane, ahead and behind. */
 const OWN_CHANGE_SPEED = 8;
 const OWN_CHANGE_ROOM_AHEAD = 40, OWN_CHANGE_ROOM_BEHIND = 30;
@@ -54,6 +57,10 @@ interface OwnLane {
   fromLane: number;
   shift: number;
   timer: number;
+  /** The lane we're signalling for, before moving over; null when not about to move. */
+  pending: number | null;
+  /** How much longer we signal before moving over. */
+  signalLeft: number;
 }
 
 /** Cars ahead and oncoming, which follow the road's lanes and keep clear of each other and of us. */
@@ -61,7 +68,7 @@ export class Traffic {
   readonly group = new THREE.Group();
   vehicles: Vehicle[] = [];
   private route: RouteDefinition;
-  private own: OwnLane = { lane: 0, fromLane: 0, shift: 1, timer: 0 };
+  private own: OwnLane = { lane: 0, fromLane: 0, shift: 1, timer: 0, pending: null, signalLeft: 0 };
   /** Keeps our car in the first lane, moving back to it when there's room, e.g. to pull in at a rest stop. */
   holdFirstLane = false;
 
@@ -80,7 +87,7 @@ export class Traffic {
     }
     this.vehicles = [];
     const first = route.traffic.ahead[0];
-    this.own = { lane: first, fromLane: first, shift: 1, timer: rand(...OWN_CHANGE_EVERY) };
+    this.own = { lane: first, fromLane: first, shift: 1, timer: 0, pending: null, signalLeft: 0 };
     const { aheadCount, oncomingCount } = route.traffic;
     for (let i = 0; i < aheadCount; i++) this.add(false, rand(30, 380));
     for (let i = 0; i < oncomingCount; i++) this.add(true, rand(50, 500));
@@ -99,6 +106,12 @@ export class Traffic {
   /** How far our car sits from the first lane, sideways, before mirroring. */
   get ownOffset(): number {
     return this.laneX(this.own) - this.route.traffic.ahead[0];
+  }
+
+  /** Which way our indicator is on: towards higher lane numbers (1), lower (-1), or off (0), before mirroring. */
+  get ownSignal(): number {
+    const own = this.own, to = own.pending ?? (own.shift < 1 ? own.lane : own.fromLane);
+    return Math.sign(to - own.fromLane);
   }
 
   /** The lanes our car is in: one, or two while moving over. */
@@ -164,8 +177,8 @@ export class Traffic {
     this.place(v);
   }
 
-  /** Puts a vehicle in a random lane near z, nudged further away until there's room for it. */
-  private spawn(v: Vehicle, z: number, lanes = v.oncoming ? this.route.traffic.oncoming : this.route.traffic.ahead): void {
+  /** Puts a vehicle in a lane near z, the kerb lane unless told otherwise, nudged further away until there's room for it. */
+  private spawn(v: Vehicle, z: number, lanes = [this.kerb(v.oncoming)]): void {
     v.lane = v.fromLane = pick(lanes);
     v.shift = 1;
     v.z = z;
@@ -173,7 +186,7 @@ export class Traffic {
       v.z += z > 0 ? MERGE_CLEARANCE : -MERGE_CLEARANCE;
     }
     v.cruise = this.route.speed * (v.oncoming ? rand(0.85, 1.1) : rand(0.9, 0.98));
-    v.changeTimer = rand(...LANE_CHANGE_EVERY);
+    v.changeTimer = rand(...LANE_DECIDE_EVERY);
   }
 
   private recycle(v: Vehicle, ourSpeed: number): void {
@@ -202,7 +215,10 @@ export class Traffic {
     }
   }
 
-  /** Every so often, or when stuck behind someone, moves over to another lane with room. */
+  /**
+   * Keeps to the kerb lane, moving out only to overtake a slower vehicle close ahead, and back in
+   * once past it. The lanes are laid out for driving on the left; mirroring makes it the right.
+   */
   private steer(v: Vehicle, dt: number, ownLanes: readonly number[]): void {
     if (v.shift < 1) {
       v.shift = Math.min(1, v.shift + dt / LANE_CHANGE_SECONDS);
@@ -212,8 +228,11 @@ export class Traffic {
     const lanes = v.oncoming ? this.route.traffic.oncoming : this.route.traffic.ahead;
     v.changeTimer -= dt;
     if (lanes.length < 2 || v.changeTimer > 0) return;
-    v.changeTimer = rand(...LANE_CHANGE_EVERY);
-    const target = pick(lanes.filter(l => l !== v.lane));
+    v.changeTimer = rand(...LANE_DECIDE_EVERY);
+    const kerb = this.kerb(v.oncoming), slowerAhead = this.slowerAhead(v, kerb, v.cruise);
+    // Out to pass someone slower, or back in once there's no one left to pass.
+    const target = v.lane === kerb ? (slowerAhead ? this.passingLane(v.oncoming) : null) : slowerAhead ? null : kerb;
+    if (target === null) return;
     if (!v.oncoming && ownLanes.includes(target) && v.z > OUR_FRONT - OWN_LANE_MERGE_AHEAD) return;
     const clear = this.vehicles.every(o => o === v || !this.occupies(o, target) || Math.abs(o.z - v.z) > MERGE_CLEARANCE + (o.length + v.length) / 2);
     if (!clear) return;
@@ -222,7 +241,28 @@ export class Traffic {
     v.shift = 0;
   }
 
-  /** Now and then, on a road with more than one lane our way, moves us over when there's room. */
+  /** The lane nearest the kerb, in our direction or the oncoming one. */
+  private kerb(oncoming: boolean): number {
+    const { ahead, oncoming: lanes } = this.route.traffic;
+    return oncoming ? lanes[lanes.length - 1] : ahead[0];
+  }
+
+  /** The lane next to the kerb lane, used for overtaking. */
+  private passingLane(oncoming: boolean): number {
+    const { ahead, oncoming: lanes } = this.route.traffic;
+    return oncoming ? lanes[lanes.length - 2] : ahead[1];
+  }
+
+  /** Whether a vehicle slower than `speed` is in the lane within overtaking reach ahead of `v`. */
+  private slowerAhead(v: Pick<Vehicle, 'z' | 'oncoming'>, lane: number, speed: number): boolean {
+    return this.vehicles.some(o => {
+      if (o === v || o.oncoming !== v.oncoming || !this.occupies(o, lane)) return false;
+      const gap = v.oncoming ? o.z - v.z : v.z - o.z;
+      return gap > 0 && gap < OVERTAKE_LOOK && o.cruise < speed * 0.97;
+    });
+  }
+
+  /** Like the other drivers: we keep to the kerb lane and move out only to overtake, then back in. */
   private steerOwn(dt: number, ourSpeed: number): void {
     const own = this.own;
     if (own.shift < 1) {
@@ -232,18 +272,35 @@ export class Traffic {
     }
     const { ahead } = this.route.traffic;
     if (ahead.length < 2) return;
-    if (this.holdFirstLane && own.lane === ahead[0]) return;
+    if (own.pending !== null) {
+      // Signalling first, then over if there's still room; otherwise the indicator goes off.
+      own.signalLeft -= dt;
+      if (own.signalLeft > 0) return;
+      const target = own.pending;
+      own.pending = null;
+      if (!this.roomFor(target)) return;
+      own.fromLane = own.lane;
+      own.lane = target;
+      own.shift = 0;
+      return;
+    }
+    const kerb = ahead[0];
     own.timer -= dt;
-    // Heading back to the first lane is tried at once, and again every step until there's room.
-    if (!this.holdFirstLane && (ourSpeed < OWN_CHANGE_SPEED || own.timer > 0)) return;
-    const target = this.holdFirstLane ? ahead[0] : pick(ahead.filter(l => l !== own.lane));
-    const room = this.vehicles.every(v => v.oncoming || !this.occupies(v, target) || v.z + v.length / 2 < OUR_FRONT - OWN_CHANGE_ROOM_AHEAD || v.z - v.length / 2 > OWN_CHANGE_ROOM_BEHIND);
-    // Without room it tries again shortly.
-    own.timer = room ? rand(...OWN_CHANGE_EVERY) : 3;
-    if (!room) return;
-    own.fromLane = own.lane;
-    own.lane = target;
-    own.shift = 0;
+    // Heading in for a rest stop doesn't wait for the next look around.
+    if (own.timer > 0 && !(this.holdFirstLane && own.lane !== kerb)) return;
+    own.timer = rand(...LANE_DECIDE_EVERY);
+    const us = { z: OUR_FRONT, oncoming: false };
+    // A rest stop ahead keeps us in, even with someone slower in front.
+    const passing = !this.holdFirstLane && ourSpeed >= OWN_CHANGE_SPEED && this.slowerAhead(us, kerb, ourSpeed);
+    const target = own.lane === kerb ? (passing ? ahead[1] : null) : passing ? null : kerb;
+    if (target === null || !this.roomFor(target)) return;
+    own.pending = target;
+    own.signalLeft = OWN_SIGNAL_SECONDS;
+  }
+
+  /** Whether our lane-to-be is clear well ahead of us and behind. */
+  private roomFor(lane: number): boolean {
+    return this.vehicles.every(v => v.oncoming || !this.occupies(v, lane) || v.z + v.length / 2 < OUR_FRONT - OWN_CHANGE_ROOM_AHEAD || v.z - v.length / 2 > OWN_CHANGE_ROOM_BEHIND);
   }
 
   /** The nearest vehicle in front of v in either lane it is in, in its direction of travel. */

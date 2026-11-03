@@ -87,6 +87,27 @@ test.describe('traffic', () => {
     expect(report).toMatchObject({ jumps: 0, cutIns: 0 });
   });
 
+  test('everyone keeps to the kerb lane, moving out only to overtake', async ({ page }) => {
+    await openApp(page, { route: 'highway' });
+    const report = await page.evaluate(() => {
+      const { simulate, traffic } = window.__drivey;
+      const kerb = (v: any) => (v.oncoming ? 13 : -0.4);
+      let inKerb = 0, settled = 0, overtakes = 0;
+      for (let i = 0; i < 4000; i++) {
+        simulate(0.05);
+        for (const v of traffic.vehicles) {
+          if (v.shift === 0 && v.lane !== kerb(v)) overtakes++;
+          if (v.shift < 1) continue;
+          settled++;
+          if (v.lane === kerb(v)) inKerb++;
+        }
+      }
+      return { kerbShare: inKerb / settled, overtakes };
+    });
+    expect(report.kerbShare).toBeGreaterThan(0.7);
+    expect(report.overtakes).toBeGreaterThan(0);
+  });
+
   test('oncoming cars change lanes too on roads with two lanes each way', async ({ page }) => {
     await openApp(page, { route: 'highway' });
     const midway = await page.evaluate(() => {
@@ -109,29 +130,50 @@ test.describe('traffic', () => {
   });
 
   for (const route of ['city', 'highway']) {
-    test(`on the ${route} route our car moves over now and then, smoothly, with the headlights`, async ({ page }) => {
+    test(`on the ${route} route our car overtakes slower cars, smoothly, with the headlights, then moves back in`, async ({ page }) => {
       await openApp(page, { route, driveSide: 'left' });
       await advance(page, 15);
       const track = await page.evaluate(() => {
         const { simulate, traffic, stage } = window.__drivey;
-        // With a car right alongside, asking to move over must wait.
+        // A slow car ahead in our lane, but another right alongside: overtaking must wait.
         const cars = traffic.vehicles.filter((v: any) => !v.oncoming);
-        for (const v of cars) v.z = -300;
-        Object.assign(cars[0], { lane: 3.2, fromLane: 3.2, shift: 1, z: 0, cruise: traffic.route.speed, speed: traffic.route.speed });
+        for (const v of cars) Object.assign(v, { z: -300, lane: -0.4, fromLane: -0.4, shift: 1, changeTimer: 99 });
+        Object.assign(cars[0], { lane: 3.2, fromLane: 3.2, z: 0, cruise: traffic.route.speed, speed: traffic.route.speed });
+        Object.assign(cars[1], { z: -35, cruise: traffic.route.speed * 0.5, speed: traffic.route.speed * 0.5 });
         traffic.own.timer = 0;
         for (let i = 0; i < 20; i++) simulate(0.05);
         const waited = traffic.ownOffset;
-        // Clears the way, and asks again.
+        // Clears the way alongside, so out we go.
         cars[0].z = -300;
         traffic.own.timer = 0;
         const xs: number[] = [];
-        for (let i = 0; i < 120; i++) {
+        // Signals first, then moves over, the indicator flashing in the door mirror on that side.
+        const { cockpit } = window.__drivey;
+        const blinks = [0, 0];
+        let flashesBeforeMoving = 0;
+        for (let i = 0; i < 160; i++) {
           simulate(0.05);
+          cockpit.update(0, 0, 0, i * 0.05);
           xs.push(stage.camera.position.x);
+          cockpit.blinkers.forEach((b: any, k: number) => (blinks[k] += b.visible ? 1 : 0));
+          if (traffic.ownOffset === 0 && cockpit.blinkers[1].visible) flashesBeforeMoving++;
         }
-        const lights = stage.scene.children.find((c: any) => c.isSpotLight).position.x;
-        return { waited, xs, lights, offset: traffic.ownOffset };
+        // Midway between the two headlamps.
+        const lamps = stage.scene.children.filter((c: any) => c.isSpotLight);
+        const lights = (lamps[0].position.x + lamps[1].position.x) / 2;
+        const offset = traffic.ownOffset;
+        // Past it, with no one else slower ahead, back into the kerb lane.
+        cars[1].z = -300;
+        cars[1].cruise = traffic.route.speed;
+        for (let i = 0; i < 200; i++) simulate(0.05);
+        return { waited, xs, lights, offset, back: traffic.ownOffset, blinks, flashesBeforeMoving, lamps: lamps.map((l: any) => l.position.x) };
       });
+      expect(track.back).toBeCloseTo(0, 1);
+      expect(track.blinks[0]).toBe(0);
+      expect(track.blinks[1]).toBeGreaterThan(20);
+      expect(track.flashesBeforeMoving).toBeGreaterThan(3);
+      // Two headlamps, a car's width apart.
+      expect(Math.abs(track.lamps[0] - track.lamps[1])).toBeGreaterThan(1);
       expect(track.waited).toBe(0);
       expect(track.offset).toBeCloseTo(3.6, 1);
       expect(track.xs.at(-1)).toBeCloseTo(3.6, 1);

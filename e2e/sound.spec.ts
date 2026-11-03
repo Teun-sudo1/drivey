@@ -32,11 +32,11 @@ test.describe('sound', () => {
     await page.click('#startTod button:has-text("Dusk")');
     const master = () => page.evaluate(() => window.__drivey.audio.graph.master.gain.value);
     await expect.poll(master).toBeGreaterThan(0.5);
-    await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false })));
-    await expect.poll(master, { timeout: 2000 }).toBeLessThan(0.01);
-    // Restored from the back-forward cache, it plays again.
-    await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
-    await expect.poll(master).toBeGreaterThan(0.5);
+    // The first sign of closing, early enough for the fade to finish.
+    await page.evaluate(() => dispatchEvent(new Event('beforeunload')));
+    await expect.poll(master, { timeout: 1000, intervals: [50] }).toBeLessThan(0.01);
+    // The page stayed open after all, so the sound comes back.
+    await expect.poll(master, { timeout: 4000 }).toBeGreaterThan(0.5);
   });
 
   test('the starter turns over while cranking, then the engine hums', async ({ page }) => {
@@ -222,6 +222,7 @@ test.describe('music', () => {
 
     await page.reload();
     await page.waitForFunction(() => window.__drivey);
+    await page.click('#btnSeated');
     await page.click('#btnGetIn');
     await page.locator('#ignition').click();
     await expect.poll(() => page.evaluate(() => window.__drivey.engine.state)).toBe('running');

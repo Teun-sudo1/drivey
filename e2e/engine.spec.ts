@@ -228,8 +228,10 @@ test.describe('the key', () => {
 
     await page.reload();
     await page.waitForFunction(() => window.__drivey);
-    await expect(page.locator('#startSetup')).toBeVisible();
+    await expect(page.locator('#startSeat')).toBeVisible();
     expect(await engineState(page)).toBe('off');
+    await page.click('#btnSeated');
+    await expect(page.locator('#startSetup')).toBeVisible();
     await expect(page.locator('#startWeather button:has-text("Snow")')).toHaveAttribute('aria-pressed', 'true');
   });
 });

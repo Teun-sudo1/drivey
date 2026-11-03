@@ -151,7 +151,8 @@ export class Environment {
     lights.hemi.intensity = env.hemi;
     lights.sun.intensity = env.sun;
     lights.sun.color.copy(env.sunCol);
-    lights.headlights.intensity = (170 * env.head + 30 * env.over * (1 - env.head)) * env.power;
+    // Two lamps whose beams overlap down the road, each a little over half of what one beam was.
+    for (const lamp of lights.headlights) lamp.intensity = 0.6 * (170 * env.head + 30 * env.over * (1 - env.head)) * env.power;
     cockpit.dashLight.intensity = (0.03 + 0.1 * env.lamp) * env.power;
     cockpit.mirror.setEnvironment(env);
     const daylight = 1 - Math.min(1, env.win);
