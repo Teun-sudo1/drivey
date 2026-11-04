@@ -56,8 +56,8 @@ const WIPER_FAR = WIPER_PARKED - Math.PI / 4;
  * both sweep the same way, the driver's pivoting by the driver's pillar with the longer blade, the passenger's from the middle.
  */
 const WIPERS = [
-  { x: 0.8, length: 0.85 },
-  { x: -0.12, length: 0.78 }
+  { x: 0.8, length: 1.05 },
+  { x: -0.12, length: 0.96 }
 ];
 /** How far below the glass the pivots sit, in pixels, on the scuttle. */
 const WIPER_PIVOT_DROP = 8;
