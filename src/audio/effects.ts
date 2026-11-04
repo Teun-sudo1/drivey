@@ -1,9 +1,30 @@
 import type { AudioEngine } from './audioEngine';
 import { filter, midiToHz } from './nodes';
 
-/** One-off sounds: the wiper blade, the phase chime, the key clicking between positions and the timer's buttons. */
+/** One-off sounds: the A/C's rush of air, the wiper blade, the phase chime, the key clicking between positions and the timer's buttons. */
 export class Effects {
   constructor(private readonly audio: AudioEngine) {}
+
+  /** The A/C kicking in: a rush of air through the vents that settles to the fan's own sound. */
+  whoosh(): void {
+    const graph = this.audio.graph;
+    if (!graph) return;
+    const { ctx, channels, noise } = graph;
+    const t = ctx.currentTime;
+    const source = ctx.createBufferSource();
+    source.buffer = noise.white;
+    const band = filter(ctx, 'bandpass', 500, 0.8), g = ctx.createGain();
+    band.frequency.setValueAtTime(500, t);
+    band.frequency.exponentialRampToValueAtTime(1800, t + 0.5);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.6, t + 0.15);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+    source.connect(band);
+    band.connect(g);
+    g.connect(channels.wind);
+    source.start(t, Math.random());
+    source.stop(t + 1);
+  }
 
   /** A blade sweeping across wet glass, ending in a soft thump as it turns. */
   swish(): void {

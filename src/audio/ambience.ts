@@ -28,10 +28,12 @@ export interface AmbienceFrame {
   follow: boolean;
   /** 0 in the open to 1 in a tunnel, where nothing patters on the glass. */
   shelter: number;
+  /** Where the fan knob is set, 0 to 1. */
+  fan: number;
 }
 
 /** How loud the scene makes each ambient channel, before the user's mix. */
-export function sceneLevels(f: Omit<AmbienceFrame, 'dt' | 'mix' | 'follow'>): Record<AmbientChannel, number> {
+export function sceneLevels(f: Omit<AmbienceFrame, 'dt' | 'mix' | 'follow' | 'fan'>): Record<AmbientChannel, number> {
   const running = f.engine === 'running' ? 1 : 0;
   const w = f.weather;
   return {
@@ -51,6 +53,7 @@ export class Ambience {
   private engineOscillators: [OscillatorNode, number][] = [];
   private starter: GainNode | null = null;
   private hum: GainNode | null = null;
+  private fan: GainNode | null = null;
   private trafficSwell: GainNode | null = null;
   private swellTimer = 0;
   private lastEngine: EngineState = 'off';
@@ -72,6 +75,8 @@ export class Ambience {
     const t = graph.ctx.currentTime;
     for (const [o, ratio] of this.engineOscillators) o.frequency.setTargetAtTime((28 + f.speed * 1.15) * ratio, t, 0.5);
     this.starter?.gain.setTargetAtTime(f.engine === 'cranking' ? 0.9 : 0, t, 0.03);
+    // The fan runs off the ignition, louder the further the knob is turned.
+    this.fan?.gain.setTargetAtTime(f.engine === 'on' || f.engine === 'running' ? f.fan ** 1.5 : 0, t, 0.25);
     if (f.engine === 'running' && this.lastEngine === 'cranking') this.catchRev(graph);
     this.lastEngine = f.engine;
 
@@ -89,6 +94,12 @@ export class Ambience {
     loop(ctx, noise.brown, [filter(ctx, 'lowpass', 1100)], ch.rain, 0.45);
     // Rain drumming on the roof: a hollow, low patter above the glass, which the heavier rain brings up with the rest.
     loop(ctx, noise.white, [filter(ctx, 'bandpass', 380, 1.4), filter(ctx, 'lowpass', 900)], ch.rain, 0.5);
+
+    // The heater fan: a soft rush of air from the vents, as loud as the knob is turned, on the wind channel.
+    this.fan = ctx.createGain();
+    this.fan.gain.value = 0;
+    this.fan.connect(ch.wind);
+    loop(ctx, noise.white, [filter(ctx, 'bandpass', 900, 0.6), filter(ctx, 'lowpass', 2600)], this.fan, 0.4);
 
     // Engine: detuned saws and a sub, under road rumble.
     this.hum = ctx.createGain();

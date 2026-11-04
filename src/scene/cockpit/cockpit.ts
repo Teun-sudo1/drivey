@@ -373,6 +373,11 @@ export class Cockpit {
     this.sideRainTexture.offset.x = (this.sideRainTexture.offset.x - speed * dt * SIDE_RAIN_DRIFT + 1) % 1;
   }
 
+  /** Where the fan knob is set, 0 at its lowest to 1 at full. */
+  get fanLevel(): number {
+    return (FAN_STOP - this.fanKnob.rotation.z) / (2 * FAN_STOP);
+  }
+
   /** Turns the fan knob by a drag, within its stops. */
   turnFan(by: number): void {
     this.fanKnob.rotation.z = THREE.MathUtils.clamp(this.fanKnob.rotation.z - by, -FAN_STOP, FAN_STOP);

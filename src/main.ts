@@ -103,12 +103,17 @@ const FIDDLE_TURN_PER_PX = 0.03, FIDDLE_SLIDE_PER_PX = 0.0004;
 const KNOB_DRAG_PX = 30;
 /** How far the head turns per pixel dragged, in radians. */
 const LOOK_PER_PX = 0.004;
+const audio = new AudioEngine(platform.playInBackground);
+const ambience = new Ambience(audio);
+const effects = new Effects(audio);
+
 // Tapping the A/C button on the dash: it lights up and keeps the glass clear of fog.
 {
   const ray = new THREE.Raycaster(), at = new THREE.Vector2(), knobAt = new THREE.Vector3(), gl = $<HTMLCanvasElement>('#gl');
   // The interior is drawn on its own layer.
   ray.layers.enableAll();
   const setAirCon = (on: boolean): void => {
+    if (on && !windshield.airCon) effects.whoosh();
     windshield.airCon = on;
     cockpit.setAirCon(on);
   };
@@ -188,9 +193,6 @@ const LOOK_PER_PX = 0.004;
 }
 
 /* Sound */
-const audio = new AudioEngine(platform.playInBackground);
-const ambience = new Ambience(audio);
-const effects = new Effects(audio);
 const player = new MusicPlayer(audio);
 windshield.onStroke(() => effects.swish());
 // Browsers only allow sound after a tap or key press, so the first one on the start screen
@@ -469,7 +471,7 @@ startLoop(dt => {
   countFrames(dt);
   const s = settings.value;
   // Once a frame rather than per simulated step, as each call schedules audio changes.
-  ambience.update({ dt, weather: WEATHERS[s.weather], route: s.route, speed: drive.speed, engine: engine.state, mix: s.mix, follow: s.follow, shelter });
+  ambience.update({ dt, weather: WEATHERS[s.weather], route: s.route, speed: drive.speed, engine: engine.state, mix: s.mix, follow: s.follow, shelter, fan: cockpit.fanLevel });
   windshield.draw();
   roadSurface.render();
   postfx.render(settings.value.bloom && quality.bloom);
