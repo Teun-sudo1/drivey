@@ -7,7 +7,7 @@ import { MIRROR_DISTANCE, MIRROR_OUTER_HEIGHT, type Framing } from '../stage';
 import type { GlassOccluder } from './cockpit';
 
 const HOUSING_MARGIN = 0.012;
-const WIDTH = 0.26, HEIGHT = MIRROR_OUTER_HEIGHT - HOUSING_MARGIN, RADIUS = 0.024;
+const WIDTH = 0.32, HEIGHT = MIRROR_OUTER_HEIGHT - HOUSING_MARGIN, RADIUS = 0.024;
 const ROOF_Y = 0.49;
 const STEM_WIDTH = 0.018;
 const CANVAS_W = 320, CANVAS_H = 92;
@@ -26,10 +26,6 @@ const HORIZON_Y = 42;
  */
 const VIEW_SHIFT = -14;
 const REAR_WINDOW: readonly (readonly [number, number])[] = [[14, 12], [CANVAS_W - 14, 5], [CANVAS_W - 14, 82], [14, 76]];
-const HEADRESTS = [
-  { x: 76, base: 73, scale: 0.86 },
-  { x: 248, base: 78, scale: 1.08 }
-];
 
 const ROAD_DRY = new THREE.Color(0x25262c);
 const ROAD_WET = new THREE.Color(0x15161b);
@@ -95,7 +91,8 @@ export class Mirror {
   private readonly stem: THREE.Mesh;
   private readonly stemOutline: THREE.Vector3[];
   private readonly ctx: CanvasRenderingContext2D;
-  private readonly texture: THREE.CanvasTexture;
+  /** The view behind, which the door mirrors show too. */
+  readonly texture: THREE.CanvasTexture;
   private readonly skyTop = new THREE.Color();
   private readonly skyBottom = new THREE.Color();
   private readonly fogColor = new THREE.Color();
@@ -219,13 +216,12 @@ export class Mirror {
     g.globalCompositeOperation = 'source-over';
     this.drawWeather();
 
-    // The car's own interior: window frame and rear headrests.
+    // The car's own rear window frame.
     g.fillStyle = '#050608';
     g.beginPath();
     g.rect(0, 0, w, h);
     this.traceRearWindow();
     g.fill('evenodd');
-    for (const rest of HEADRESTS) this.headrest(rest.x, rest.base, rest.scale);
 
     const sheen = g.createLinearGradient(0, 0, w, h);
     sheen.addColorStop(0.3, 'rgba(255,255,255,0)');
@@ -252,40 +248,6 @@ export class Mirror {
       g.arcTo(cx, cy, nx, ny, 14);
     }
     g.closePath();
-  }
-
-  /** A padded cushion on two posts above the top of the seatback, which starts at base. */
-  private headrest(x: number, base: number, scale: number): void {
-    const g = this.ctx;
-    g.save();
-    g.translate(x, base);
-    g.scale(scale, scale);
-    g.fillStyle = '#5a5e6a';
-    g.fillRect(-17, -10, 4, 12);
-    g.fillRect(13, -10, 4, 12);
-
-    g.fillStyle = '#2a2c33';
-    g.beginPath();
-    g.roundRect(-46, 0, 92, (CANVAS_H - base) / scale + 4, [18, 18, 0, 0]);
-    g.fill();
-
-    const cushion = g.createLinearGradient(0, -38, 0, -8);
-    cushion.addColorStop(0, '#565a66');
-    cushion.addColorStop(1, '#2c2e36');
-    g.fillStyle = cushion;
-    g.strokeStyle = 'rgba(190,198,212,.5)';
-    g.lineWidth = 1.5;
-    g.beginPath();
-    g.roundRect(-34, -38, 68, 30, [16, 16, 8, 8]);
-    g.fill();
-    g.stroke();
-    // A seam across the padding.
-    g.strokeStyle = 'rgba(0,0,0,.35)';
-    g.beginPath();
-    g.moveTo(-28, -22);
-    g.lineTo(28, -22);
-    g.stroke();
-    g.restore();
   }
 
   private drawWeather(): void {

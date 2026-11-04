@@ -28,6 +28,9 @@ export interface Windshield {
   draw(): void;
   /** The streetlight colour drops pick up, which differs by route. */
   setLampTint(tint: LampTint): void;
+  /** With the A/C on, the glass clears of fog, as it does in a real car. */
+  airCon: boolean;
+
   /** Steams the glass up, or clears it as the demister would; instantly skips the easing. */
   setMisted(misted: boolean, instantly?: boolean): void;
 }
@@ -56,6 +59,9 @@ const WIPER_BLADE_WIDTH = 0.0067;
 const DRY_RATE = 0.15;
 const FLAKE_MELT_RATE = 0.06;
 const VEIL_RATE = 1.1;
+/** How fogged the glass gets from the inside in wet weather without the A/C, and how slowly it gets there. */
+const FOGGED_UP = 0.3;
+const FOG_UP_RATE = 0.05;
 /** How quickly the glass clears once a seat is picked. */
 const DEMIST_RATE = 1.6;
 const GLASS_LOWER_EDGE = [-1.4, -0.26, 0.9];
@@ -120,6 +126,8 @@ class CanvasWindshield implements Windshield {
   /** Steamed-up glass, which hides the view until the driver has picked a seat. */
   private mist = 0;
   private mistTarget = 0;
+  /** The A/C, which keeps the glass from fogging over. */
+  airCon = false;
   private wiperPhase = 0;
   private wiperWait = 0;
   private wiperAngle = WIPER_PARKED;
@@ -160,7 +168,10 @@ class CanvasWindshield implements Windshield {
     this.spawn(dt * (1 - shelter), weather, lamp);
     this.age(dt, speed, weather);
     this.moveWipers(dt, weather, wipersOn);
-    this.veil = lerp(this.veil, weather.veil, damp(VEIL_RATE, dt));
+    // In rain or fog the glass slowly fogs over from the inside too, unless the A/C is on, which clears it.
+    const inside = weather.rain > 0 || weather.veil > 0 ? FOGGED_UP : 0;
+    const target = this.airCon ? 0 : weather.veil + inside;
+    this.veil = lerp(this.veil, target, damp(target > this.veil ? FOG_UP_RATE : VEIL_RATE, dt));
     this.mist = Math.abs(this.mist - this.mistTarget) < 0.002 ? this.mistTarget : lerp(this.mist, this.mistTarget, damp(DEMIST_RATE, dt));
   }
 
@@ -193,8 +204,8 @@ class CanvasWindshield implements Windshield {
     this.camera.updateMatrixWorld(true);
     const H = this.height, parent = this.roof.parent as THREE.Object3D;
     let lowest = H;
-    for (const x of GLASS_LOWER_EDGE) lowest = Math.min(lowest, this.project(x, -0.455, -1.36, parent).y);
-    this.bottom = clamp(lowest - 6, H * 0.4, H);
+    for (const x of GLASS_LOWER_EDGE) lowest = Math.min(lowest, this.project(x, -0.47, -1.38, parent).y);
+    this.bottom = clamp(lowest, H * 0.4, H);
     this.top = clamp(this.project(-0.35, this.roof.position.y + 0.485, -1.09, parent).y, 0, H * 0.3);
     this.drops = this.drops.filter(d => d.y < this.bottom - d.r * 0.5);
   }
@@ -241,14 +252,16 @@ class CanvasWindshield implements Windshield {
   }
 
   private get wiperPivots(): [number, number][] {
-    const y = this.bottom + this.height * 0.03;
-    return [[this.width * 0.2, y], [this.width * 0.6, y]];
+    // Just below the glass, so parked blades rest on the scuttle in view, above the dash.
+    const y = this.bottom + this.height * 0.008;
+    // Far enough apart that the right one parks clear of the gauge hood, so both show.
+    return [[this.width * 0.36, y], [this.width * 0.86, y]];
   }
 
   private get wiperLength(): number {
     // Tall glass needs blades long relative to its width, or they only clear the bottom of it.
     const widthShare = this.height > this.width ? PORTRAIT_WIPER_REACH : LANDSCAPE_WIPER_REACH;
-    return Math.min(this.width * widthShare, this.bottom * 1.02);
+    return Math.min(this.width * widthShare, this.bottom * 1.3);
   }
 
   private moveWipers(dt: number, w: Weather, wipersOn: boolean): void {
@@ -302,6 +315,14 @@ class CanvasWindshield implements Windshield {
     g.clearRect(0, 0, this.width, this.height);
     g.save();
     this.clipToGlass();
+    // Outside the glass, so under everything on it: the film, mist and drops all lie between the eye and the blades.
+    g.save();
+    if (this.mirrored) {
+      g.translate(this.width, 0);
+      g.scale(-1, 1);
+    }
+    this.drawWipers();
+    g.restore();
     if (this.veil > 0.001) {
       g.fillStyle = `rgba(190,200,212,${this.veil})`;
       g.fillRect(0, 0, this.width, this.bottom);
@@ -318,7 +339,6 @@ class CanvasWindshield implements Windshield {
       g.scale(-1, 1);
     }
     this.drawSmear();
-    if (this.wiperAngle !== WIPER_PARKED || this.wiperPeriod > 0) this.drawWipers();
     g.restore();
     if (this.mist > 0) this.mistSideWindows();
   }

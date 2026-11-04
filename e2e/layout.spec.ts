@@ -1,4 +1,5 @@
-import { brightnessAt, expect, isPhone, isPortrait, openApp, test } from './support';
+import { RELEASES } from '../src/app/whatsNew';
+import { brightnessAt, expect, isPortrait, openApp, openParked, test } from './support';
 
 test.describe('layout', () => {
   test('the scene renders and the first frame runs forwards', async ({ page }) => {
@@ -45,8 +46,8 @@ test.describe('layout', () => {
     await openApp(page);
     const size = page.viewportSize()!;
     const fov = () => page.evaluate(() => window.__drivey.stage.camera.fov);
-    // Laptops sit back from the wheel; a phone on its side sits close, which narrows the view.
-    const landscapeFov = isPhone(page) ? 55 : 62;
+    // Sat back, as every screen starts; upright widens the view to make up for the narrow screen.
+    const landscapeFov = 72;
     const startFov = isPortrait(page) ? 70 : landscapeFov, otherFov = isPortrait(page) ? landscapeFov : 70;
     expect(await fov()).toBeCloseTo(startFov, 1);
 
@@ -93,4 +94,13 @@ test.describe('layout', () => {
     await page.click('.tog[data-k="reduced"]');
     await expect(page.locator('body')).toHaveClass(/reduced/);
   });
+});
+
+test('the setup card notes the latest release, and Stats lists them all', async ({ page }) => {
+  await openParked(page);
+  await expect(page.locator('#startNews')).toContainText(RELEASES[0].notes);
+  await page.evaluate(() => window.__drivey.startScreen.skip());
+  await page.click('#btnPanel');
+  await page.click('[data-tab="stats"]');
+  await expect(page.locator('#changelog li')).toHaveCount(RELEASES.length);
 });

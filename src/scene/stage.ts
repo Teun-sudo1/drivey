@@ -7,15 +7,13 @@ export const INTERIOR_LAYER = 1;
 
 /** How far ahead of the eye the rear-view mirror hangs. */
 export const MIRROR_DISTANCE = 0.78;
-export const MIRROR_OUTER_HEIGHT = 0.087;
+export const MIRROR_OUTER_HEIGHT = 0.1;
 
 const EYE_HEIGHT = 1.22;
 const NEAR = 0.15; // far enough out to keep depth precision for the road decals
 const REFRAME_RATE = 6;
-/** Screens whose short side is under this are phones, which sit close by default. */
-const PHONE_SHORT_SIDE = 500;
 
-const FRAMING_KEYS = ['fov', 'pitch', 'roofY', 'mirrorX', 'mirrorY', 'mirrorYaw', 'radioX', 'radioY', 'radioZ', 'radioTilt', 'radioScale', 'radioSide', 'gaugeScale', 'seatBack', 'lookDown'] as const;
+const FRAMING_KEYS = ['fov', 'pitch', 'roofY', 'mirrorX', 'mirrorY', 'mirrorYaw', 'radioX', 'radioY', 'radioZ', 'radioTilt', 'radioScale', 'radioSide', 'gaugeScale', 'seatBack', 'lookDown', 'eyeDrop'] as const;
 
 /** How the camera frames the car in each orientation. */
 export interface Framing {
@@ -39,23 +37,22 @@ export interface Framing {
   seatBack: number;
   /** How far the eye looks down into the car, beyond the pitch; the interior stays put in the car while the view tilts. */
   lookDown: number;
+  /** How far the eye sits below its usual height, as if the seat were lower. */
+  eyeDrop: number;
 }
+/** How far the head turns when looking around. */
+const LOOK_YAW = 1.3, LOOK_UP = 0.35, LOOK_DOWN = 0.6;
 const LANDSCAPE: Framing = {
-  fov: 62, pitch: -0.04, roofY: 0, mirrorX: -0.33, mirrorY: 0.29, mirrorYaw: 0.12,
+  fov: 72, pitch: -0.04, roofY: 0, mirrorX: -0.33, mirrorY: 0.29, mirrorYaw: 0.12,
   // On its own pod, on top of the timer display's housing.
-  radioX: -0.58, radioY: -0.345, radioZ: -0.975, radioTilt: -0.2, radioScale: 1, radioSide: 0, gaugeScale: 1, seatBack: 0.4, lookDown: 0.1
+  radioX: -0.435, radioY: -0.6, radioZ: -0.84, radioTilt: -0.35, radioScale: 1, radioSide: 0, gaugeScale: 1, seatBack: 0.2, lookDown: 0.24, eyeDrop: 0
 };
 /** Close to the wheel, as a phone on its side sits by default, so the radio stays big enough to read and tap. */
+/** Upright, the eye sits this much lower and looks this much higher, so the road fills more of the tall screen. */
+/** Upright the screen is narrow, so the view is wider than a sideways phone's close-up. */
+const PORTRAIT_FOV = 70;
+const PORTRAIT_EYE_DROP = 0.06, PORTRAIT_TILT_UP = 0.1;
 const CLOSE: Framing = { ...LANDSCAPE, fov: 55, seatBack: 0, lookDown: 0 };
-/** Sat back with the phone upright: straight back, so the mirror can still be placed below the top bar. */
-const PORTRAIT_BACK_SEAT = 0.3;
-/** The roof is framed out of view here, so the mirror hangs just below the top bar instead; see targetFraming. */
-const PORTRAIT: Framing = {
-  fov: 70, pitch: 0.07, roofY: 0.42, mirrorX: -0.03, mirrorY: 0, mirrorYaw: 0.03,
-  // The timer display is out of view here, so it sits on the dash top, left of centre.
-  radioX: 0, radioY: -0.22, radioZ: -0.93, radioTilt: -0.26, radioScale: 0.78, radioSide: 1, gaugeScale: 0.78, seatBack: 0, lookDown: 0
-};
-
 function blend(a: Framing, b: Framing, t: number): Framing {
   const out = { ...a };
   for (const key of FRAMING_KEYS) out[key] = lerp(a[key], b[key], t);
@@ -75,9 +72,10 @@ export class Stage {
   private readonly skyTexture: THREE.CanvasTexture;
   private readonly resizeListeners = new Set<(w: number, h: number, pixelRatio: number) => void>();
   private settled = false;
-  private mirrorTopPx = 0;
 
   constructor(canvas: HTMLCanvasElement) {
+    // Turning the head looks round first, then up or down, as a person does.
+    this.camera.rotation.order = 'YXZ';
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.scene.fog = this.fog;
@@ -93,6 +91,15 @@ export class Stage {
     addEventListener('resize', () => this.resize());
     Object.assign(this.framing, this.targetFraming());
     this.resize();
+  }
+
+  /** Where the driver is looking, dragged round from straight ahead: yaw left/right and pitch up/down, in radians. */
+  readonly look = { yaw: 0, pitch: 0 };
+
+  /** Turns the head by a drag, within what a seated driver can see. */
+  lookBy(yaw: number, pitch: number): void {
+    this.look.yaw = Math.min(LOOK_YAW, Math.max(-LOOK_YAW, this.look.yaw + yaw));
+    this.look.pitch = Math.min(LOOK_UP, Math.max(-LOOK_DOWN, this.look.pitch + pitch));
   }
 
   get eyeHeight(): number {
@@ -120,12 +127,6 @@ export class Stage {
     this.resize();
   }
 
-  /** Where the mirror's top edge should sit in portrait, in CSS pixels from the top of the screen. */
-  setMirrorTop(px: number): void {
-    this.mirrorTopPx = px;
-    this.settled = false;
-  }
-
   /** Eases towards the framing for the current orientation, so rotation doesn't jump. */
   updateFraming(dt: number, snap: boolean): void {
     if (this.settled) return;
@@ -148,21 +149,22 @@ export class Stage {
     if (snap) Object.assign(this.framing, this.targetFraming());
   }
 
-  /** How far back the driver sits on this screen. */
+  /** How far back the driver sits: sat back, as on every screen, until chosen. */
   povFor(): number {
-    return this.pov ?? (Math.min(innerWidth, innerHeight) < PHONE_SHORT_SIDE ? 0 : 1);
+    return this.pov ?? 1;
   }
 
+  /** The same cockpit on every screen; upright shows less of it, so the eye tilts up to keep the road in view. */
   private targetFraming(): Framing {
-    const pov = this.povFor();
-    if (innerHeight <= innerWidth) return blend(CLOSE, LANDSCAPE, pov);
-    // The cockpit hangs off the camera, so this is plain projection with no pitch involved.
-    const seatBack = pov * PORTRAIT_BACK_SEAT, distance = MIRROR_DISTANCE + seatBack;
-    const focal = innerHeight / 2 / Math.tan(THREE.MathUtils.degToRad(PORTRAIT.fov / 2));
-    const heightPx = (MIRROR_OUTER_HEIGHT / distance) * focal;
-    const centerPx = this.mirrorTopPx + heightPx / 2;
-    return { ...PORTRAIT, seatBack, mirrorY: ((innerHeight / 2 - centerPx) / focal) * distance };
+    const framing = blend(CLOSE, LANDSCAPE, this.povFor());
+    if (innerHeight > innerWidth) {
+      framing.fov = PORTRAIT_FOV;
+      framing.lookDown -= PORTRAIT_TILT_UP;
+      framing.eyeDrop = PORTRAIT_EYE_DROP;
+    }
+    return framing;
   }
+
 
   private resize(): void {
     const w = innerWidth, h = innerHeight;

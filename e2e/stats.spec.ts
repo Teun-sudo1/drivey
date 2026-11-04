@@ -46,7 +46,7 @@ test.describe('stats', () => {
     await expect(page.locator('#hist li')).toHaveCount(1);
     await expect(page.locator('#hist li span')).toHaveText('Write the report');
     await expect(page.locator('#hist li em')).toContainText('25 min');
-    await expect(page.locator('#hist li em')).toContainText('City expressway, rain');
+    await expect(page.locator('#hist li em')).toContainText('Highway, clear');
 
     await page.reload();
     await page.evaluate(() => window.__drivey.startScreen.skip());

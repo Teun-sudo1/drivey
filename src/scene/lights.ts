@@ -29,7 +29,8 @@ export function createLights(scene: THREE.Scene): SceneLights {
   const headlights = [-LAMP_SPREAD, LAMP_SPREAD].map(dx => {
     // Narrower and crisper-edged than one big beam, so each lamp's pool reads on its own.
     const lamp = new THREE.SpotLight(0xfff0d8, 0, 110, 0.36, 0.5, 1.35);
-    lamp.position.set(-0.4 + dx, 0.75, -2.2);
+    // At the lamps, at the front of the bonnet, so the beams fall on the road and not on the car.
+    lamp.position.set(-0.4 + dx, 0.5, -4.15);
     lamp.target.position.set(-0.6 + dx + Math.sign(dx) * LAMP_TOE, 0, -60);
     scene.add(lamp, lamp.target);
     return lamp;

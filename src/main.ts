@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
@@ -49,10 +50,11 @@ import { Environment } from './weather/environment';
 import { Particles } from './weather/particles';
 import { LATER, TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './weather/tables';
 import { createWindshield } from './weather/windshield';
+import { renderChangelog } from './app/whatsNew';
 
-const MIRROR_GAP_PX = 8;
 
 const platform = getPlatform();
+renderChangelog($('#changelog'), $('#startNews'));
 const settings = await SettingsStore.load(platform.storage);
 
 /* Scene */
@@ -89,6 +91,73 @@ const startScreen = createStartScreen(engine, instantly => {
   cockpit.setCabinLight(false);
   cockpit.setNavLoading(false);
 });
+
+/** How far the volume knob is dragged, in pixels, for a quarter of the volume. */
+const KNOB_DRAG_PX = 30;
+/** How far the head turns per pixel dragged, in radians. */
+const LOOK_PER_PX = 0.004;
+// Tapping the A/C button on the dash: it lights up and keeps the glass clear of fog.
+{
+  const ray = new THREE.Raycaster(), at = new THREE.Vector2(), gl = $<HTMLCanvasElement>('#gl');
+  // The interior is drawn on its own layer.
+  ray.layers.enableAll();
+  const setAirCon = (on: boolean): void => {
+    windshield.airCon = on;
+    cockpit.setAirCon(on);
+  };
+  // The radio's volume knob turns as it's dragged up or down.
+  let turning: { y: number; volume: number } | null = null;
+  // Dragging anywhere else turns the head to look around the car; the button beside fullscreen faces forward again.
+  let looking: { x: number; y: number } | null = null;
+  const btnLook = $('#btnLook');
+  gl.addEventListener('pointermove', e => {
+    if (looking) {
+      stage.lookBy((e.clientX - looking.x) * LOOK_PER_PX, (e.clientY - looking.y) * LOOK_PER_PX);
+      looking = { x: e.clientX, y: e.clientY };
+      btnLook.hidden = false;
+    }
+    if (!turning) return;
+    const dy = (turning.y - e.clientY) / KNOB_DRAG_PX;
+    settings.update({ mix: { ...settings.value.mix, music: Math.min(1, Math.max(0, turning.volume + dy * 0.25)) } });
+  });
+  addEventListener('pointerup', () => (turning = looking = null));
+  btnLook.addEventListener('click', () => {
+    stage.lookBy(-stage.look.yaw, -stage.look.pitch);
+    btnLook.hidden = true;
+  });
+  gl.addEventListener('pointerdown', e => {
+    at.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+    ray.setFromCamera(at, stage.camera);
+    if (ray.intersectObject(cockpit.radio.volumeKnob).length) {
+      turning = { y: e.clientY, volume: settings.value.mix.music };
+      gl.setPointerCapture(e.pointerId);
+      return;
+    }
+    if (!ray.intersectObject(cockpit.acButton).length) {
+      // The radio's own buttons and slider take their taps and drags.
+      if (ray.intersectObject(cockpit.radio.group).length) return;
+      looking = { x: e.clientX, y: e.clientY };
+      gl.setPointerCapture(e.pointerId);
+      return;
+    }
+    setAirCon(!windshield.airCon);
+    effects.press(windshield.airCon);
+  });
+  // In rain or fog it's on from the moment the weather turns, so the glass never fogs unless the driver
+  // switches it off; in dry weather it goes off again.
+  let weatherFor = '';
+  const followWeather = (): void => {
+    const { weather } = settings.value;
+    if (weather === weatherFor) return;
+    weatherFor = weather;
+    const wet = WEATHERS[weather].rain > 0 || WEATHERS[weather].veil > 0;
+    if (wet === windshield.airCon) return;
+    setAirCon(wet);
+    if (wet) toast('A/C on to keep the glass clear');
+  };
+  settings.onChange(followWeather);
+  followWeather();
+}
 
 /* Sound */
 const audio = new AudioEngine(platform.playInBackground);
@@ -168,8 +237,6 @@ const hud = createHud(
 const surface = createControlSurface(() => idle.wake(), tab => {
   if (tab === 'stats') stats.render();
 });
-const topBar = $('#top');
-stage.onResize(() => stage.setMirrorTop(topBar.getBoundingClientRect().bottom + MIRROR_GAP_PX));
 const idle = createIdleFade(() => timer.running && !surface.isOpen());
 
 // The timer's buttons click like dashboard switches. The HUD has already toggled the timer by now.
@@ -335,6 +402,7 @@ function simulate(dt: number): void {
   drive.update(dt, engine.state, s.breakSlow && timer.phase !== 'focus', s.reduced, environment.lampLevel, resting ? pool.restStopDistance() : null);
   traffic.update(dt, drive.speed, environment.headlightLevel);
   cockpit.setSignal(traffic.ownSignal);
+  cockpit.setHeadlamps(environment.headlightLevel);
   cockpit.update(dt, drive.speed, drive.bend, drive.clock);
   const shelters = pool.shelters();
   // Nothing falls inside a tunnel; the camera sits at z = 0.

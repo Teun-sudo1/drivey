@@ -32,7 +32,7 @@ test.describe('timer', () => {
   });
 
   test('finishing a session announces the break and slows the car', async ({ page }) => {
-    await openApp(page);
+    await openApp(page, { route: 'city' });
     await advance(page, 20);
     expect(await page.evaluate(() => window.__drivey.drive.speed)).toBeGreaterThan(20);
     await page.click('#btnPlay');

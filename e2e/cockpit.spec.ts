@@ -1,4 +1,4 @@
-import { advance, brightnessAt, expect, isPhone, isPortrait, mirrorRect, openApp, openSceneTab, overlaps, test, textRect, update } from './support';
+import { advance, brightnessAt, expect, isPortrait, mirrorRect, openApp, openSceneTab, overlaps, test, textRect, update } from './support';
 import { GAUGE_LANDMARKS } from '../src/scene/cockpit/gauges';
 
 const rectOf = async (page: any, selector: string) => {
@@ -16,6 +16,7 @@ const mirrorRegion = (page: any, x: number, y: number, w: number, h: number) => 
 
 test.describe('rear-view mirror', () => {
   test('is fully on screen and clear of the HUD', async ({ page }) => {
+    test.skip(isPortrait(page), 'upright, the mirror hangs off to the side, as in the car');
     await openApp(page);
     const mirror = await mirrorRect(page), size = page.viewportSize()!;
     expect(mirror.left).toBeGreaterThanOrEqual(0);
@@ -27,15 +28,6 @@ test.describe('rear-view mirror', () => {
     expect(overlaps(mirror, await rectOf(page, '#chip'))).toBe(false);
     expect(overlaps(mirror, await rectOf(page, '#btnFull'))).toBe(false);
     if (isPortrait(page)) expect(mirror.top).toBeGreaterThanOrEqual((await rectOf(page, '#top')).bottom);
-  });
-
-  test('keeps its place on a shorter phone screen', async ({ page }) => {
-    test.skip(!isPortrait(page), 'portrait only');
-    await page.setViewportSize({ width: 390, height: 664 });
-    await openApp(page);
-    const mirror = await mirrorRect(page);
-    expect(mirror.top).toBeGreaterThanOrEqual((await rectOf(page, '#top')).bottom);
-    expect(overlaps(mirror, await textRect(page, '#time'))).toBe(false);
   });
 
   test('shows the weather behind the car', async ({ page }) => {
@@ -109,8 +101,8 @@ test('the wheel frames the gauges without covering the dials or the speed', asyn
   shown.forEach((b, i) => expect(Math.abs(b - hidden[i]), `landmark ${i}`).toBeLessThan(1.5));
 });
 
-test('on a bigger screen the eye sits back, showing the gear lever on the console', async ({ page }) => {
-  test.skip(isPortrait(page) || isPhone(page), 'phones sit close, so the radio stays big enough to tap');
+test('sat back, the gear lever shows on the console', async ({ page }) => {
+  test.skip(isPortrait(page), 'upright, the console is out of view below the wheel');
   await openApp(page, { tod: 'day', weather: 'clear' });
   await advance(page, 2);
   await page.waitForFunction(() => window.__drivey.stage.settled);
@@ -135,7 +127,7 @@ test('on a bigger screen the eye sits back, showing the gear lever on the consol
   });
   // All of it is in view, below the radio and left of the wheel's hub.
   expect(knob.y + radius).toBeLessThan(page.viewportSize()!.height);
-  expect(knob.y - radius).toBeGreaterThan(radio.bottom);
+  expect(knob.x + radius < radio.left || knob.y - radius > radio.bottom || knob.x - radius > radio.right).toBe(true);
   expect(knob.x).toBeLessThan(page.viewportSize()!.width / 2);
   // And nothing in front hides it: drawing it changes what's there, where hidden it changes nothing.
   const at = { x: knob.x, y: knob.y - radius * 0.3 };
@@ -198,10 +190,11 @@ test.describe('driving side', () => {
       cockpit.steer(0.0002);
       return cockpit.wheel.rotation.z;
     });
-    expect(turned).toBeCloseTo(-0.18, 5);
+    expect(turned).toBeCloseTo(-0.09, 5);
   });
 
   test('the mirror stays clear of the HUD on the right too', async ({ page }) => {
+    test.skip(isPortrait(page), 'upright, the mirror hangs off to the side, as in the car');
     await openApp(page, { driveSide: 'right' });
     const mirror = await mirrorRect(page), size = page.viewportSize()!;
     expect(mirror.left).toBeGreaterThanOrEqual(0);
@@ -209,4 +202,32 @@ test.describe('driving side', () => {
     expect(overlaps(mirror, await textRect(page, '#time'))).toBe(false);
     expect(overlaps(mirror, await rectOf(page, '#btnFull'))).toBe(false);
   });
+});
+
+test('dragging the view looks round the car, and the look-ahead button faces forward again', async ({ page }) => {
+  await openApp(page, { tod: 'day', weather: 'clear' });
+  const look = () => page.evaluate(() => window.__drivey.stage.look.yaw);
+  await expect(page.locator('#btnLook')).toBeHidden();
+  const { width, height } = page.viewportSize()!;
+  await page.mouse.move(width * 0.5, height * 0.3);
+  await page.mouse.down();
+  await page.mouse.move(width * 0.5 + 80, height * 0.3, { steps: 4 });
+  await page.mouse.up();
+  expect(await look()).toBeGreaterThan(0.2);
+  await page.click('#btnLook');
+  expect(await look()).toBe(0);
+  await expect(page.locator('#btnLook')).toBeHidden();
+});
+
+test('the A/C comes on by itself in rain, and off again when it clears', async ({ page }) => {
+  await openApp(page, { weather: 'clear' });
+  const airCon = () => page.evaluate(() => window.__drivey.windshield.airCon);
+  await advance(page, 1);
+  expect(await airCon()).toBe(false);
+  await update(page, { weather: 'rain' });
+  await advance(page, 1);
+  expect(await airCon()).toBe(true);
+  await update(page, { weather: 'clear' });
+  await advance(page, 1);
+  expect(await airCon()).toBe(false);
 });

@@ -1,5 +1,7 @@
 #gl, #glass { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 #glass { pointer-events: none; }
+/* Dragging the scene looks around rather than scrolling the page. */
+#gl { touch-action: none; }
 /* Reachable by keyboard and screen readers; the visible control is the fader on the dashboard. */
 [hidden] { display: none !important; }
 .visually-hidden { position: fixed; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -103,3 +105,13 @@ body.reduced #start.cranking #ignition svg { animation: none; }
   25% { transform: translate(-1.5px, 1px); }
   75% { transform: translate(1.5px, -1px); }
 }
+
+/* On opening: the dusk sky fades up behind the glowing name, then gives way to the car. Taps pass straight through. */
+#intro { position: fixed; inset: 0; z-index: 100; pointer-events: none; display: grid; place-items: center; background: linear-gradient(#1c2346, #b0566a 55%, #ffb070); animation: intro-out .7s ease-in 1.5s forwards; }
+#intro::before { content: ''; position: absolute; inset: 0; background: #000; animation: intro-in .8s ease-out forwards; }
+#intro h1 { position: relative; font-family: var(--mono); font-weight: 400; font-size: clamp(40px, 9vw, 84px); letter-spacing: .14em; color: #ffd8b0; text-shadow: 0 0 32px rgba(255, 160, 80, .6); opacity: 0; animation: intro-word .6s ease-out .2s forwards; }
+@keyframes intro-in { to { opacity: 0; } }
+@keyframes intro-word { to { opacity: 1; } }
+@keyframes intro-out { to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { #intro { display: none; } }
+body.reduced #intro { display: none; }

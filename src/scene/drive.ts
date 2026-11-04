@@ -81,14 +81,15 @@ export class Drive {
     const { camera, framing, eyeHeight } = this.stage;
     const t = this.clock, sway = reducedMotion ? REDUCED_MOTION_SWAY : 1;
     const crank = cranking && !reducedMotion ? CRANK_SHAKE : 0;
-    camera.position.y = Math.sin(t * 61) * crank + eyeHeight + Math.sin(t * 9.3) * 0.0025 * sway * (this.speed / 22) + Math.sin(t * 1.7) * 0.004 * sway;
+    camera.position.y = Math.sin(t * 61) * crank + eyeHeight - framing.eyeDrop + Math.sin(t * 9.3) * 0.0025 * sway * (this.speed / 22) + Math.sin(t * 1.7) * 0.004 * sway;
     camera.position.x = this.laneOffset + Math.sin(t * 0.43) * 0.02 * sway;
+    const { look } = this.stage;
     camera.rotation.set(
-      framing.pitch - framing.lookDown + Math.sin(t * 0.8) * 0.002 * sway,
-      -this.bend * 20 + Math.sin(t * 0.31) * 0.006 * sway,
+      framing.pitch - framing.lookDown + look.pitch + Math.sin(t * 0.8) * 0.002 * sway,
+      -this.bend * 20 + look.yaw + Math.sin(t * 0.31) * 0.006 * sway,
       Math.sin(t * 0.5) * 0.002 * sway + Math.sin(t * 47) * crank
     );
-    this.cockpit.seat(framing.seatBack, framing.lookDown);
+    this.cockpit.seat(framing.seatBack, framing.lookDown - look.pitch, look.yaw, framing.eyeDrop);
     this.cockpit.roof.position.y = framing.roofY;
     this.cockpit.mirror.place(framing);
     this.cockpit.radio.place(framing);

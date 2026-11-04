@@ -20,12 +20,13 @@ export function createLcd() {
     g.save();
     g.shadowColor = 'rgba(255,122,26,.3)';
     g.shadowBlur = 2;
-    g.fillStyle = '#e0975a';
+    // The same orange as the PAUSED label above it.
+    g.fillStyle = '#ff8c32';
     g.fillText(txt, digitsX, digitsY);
     g.restore();
     g.textAlign = stacked ? 'center' : 'left';
     g.font = '600 14px Inter, sans-serif';
-    g.fillStyle = '#e8873a';
+    g.fillStyle = '#ff8c32';
     g.fillText(label, stacked ? w / 2 : 12, stacked ? 20 : 24);
     if (!stacked) {
       g.fillStyle = 'rgba(255,175,95,.45)';

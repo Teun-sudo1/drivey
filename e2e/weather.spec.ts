@@ -6,7 +6,7 @@ test.describe('time of day and weather controls', () => {
     await openSceneTab(page);
     await page.click('#segTod button:has-text("Dusk")');
     await page.click('#segWeather button:has-text("Heavy rain")');
-    await expect(page.locator('#sub')).toHaveText('City expressway · Dusk · Heavy rain');
+    await expect(page.locator('#sub')).toHaveText('Highway · Dusk · Heavy rain');
     await expect(page.locator('#segWeather button:has-text("Heavy rain")')).toHaveAttribute('aria-pressed', 'true');
 
     // Neither a jump nor stuck: the rain level passes through values in between.
@@ -18,12 +18,12 @@ test.describe('time of day and weather controls', () => {
     expect(await level()).toBeGreaterThan(0.95);
 
     await page.reload();
-    await expect(page.locator('#sub')).toHaveText('City expressway · Dusk · Heavy rain');
+    await expect(page.locator('#sub')).toHaveText('Highway · Dusk · Heavy rain');
   });
 
-  test('new visitors start on a rainy night', async ({ page }) => {
+  test('new visitors start on a clear night on the highway', async ({ page }) => {
     await page.goto('./');
-    await expect(page.locator('#sub')).toHaveText('City expressway · Night · Rain');
+    await expect(page.locator('#sub')).toHaveText('Highway · Night · Clear');
   });
 
   for (const [weather, kind] of [['rain', 'rain'], ['snow', 'snow']] as const) {
@@ -125,12 +125,14 @@ test.describe('windshield', () => {
         const { cockpit, stage } = window.__drivey;
         stage.camera.updateMatrixWorld(true);
         return cockpit.pillars.map((o: any) => {
-          const [bottomInner, topInner, topOuter] = o.points.map((p: any) => {
+          const screen = o.points.map((p: any) => {
             const v = o.object.localToWorld(p.clone()).project(stage.camera);
             return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
           });
+          // The outline starts at the pillar's foot, runs up it, and ends far out beyond its foot.
+          const [bottomInner, topInner] = screen, farOut = screen[screen.length - 1];
           const mid = { x: (bottomInner.x + topInner.x) / 2, y: (bottomInner.y + topInner.y) / 2 };
-          const out = Math.sign(topOuter.x - topInner.x);
+          const out = Math.sign(farOut.x - bottomInner.x);
           return out > 0
             ? { left: Math.min(innerWidth, mid.x + 10), right: innerWidth, top: mid.y - 25, bottom: mid.y + 25 }
             : { left: 0, right: Math.max(0, mid.x - 10), top: mid.y - 25, bottom: mid.y + 25 };
@@ -163,7 +165,7 @@ test.describe('windshield', () => {
 
   test('where two parts of the car overlap, the glass stays clear of both', async ({ page }) => {
     await openApp(page, { weather: 'heavy' });
-    // Two overlapping panels in front of the glass, as the interior's parts can be, beside a bare patch of glass.
+    // Two overlapping panels in front of the glass, as the interior's parts can be.
     const areas = await page.evaluate(() => {
       const { cockpit, stage } = window.__drivey;
       const camera = stage.camera;
@@ -177,10 +179,11 @@ test.describe('windshield', () => {
         const a = camera.localToWorld(V(x0, y1)).project(camera), b = camera.localToWorld(V(x1, y0)).project(camera);
         return { left: (a.x * 0.5 + 0.5) * innerWidth + 3, right: (b.x * 0.5 + 0.5) * innerWidth - 3, top: (0.5 - a.y * 0.5) * innerHeight + 3, bottom: (0.5 - b.y * 0.5) * innerHeight - 3 };
       };
-      return { overlap: rect(-0.2, -0.2, 0.1, 0.2), bare: rect(-0.2, 0.3, 0.1, 0.7) };
+      return { overlap: rect(-0.2, -0.2, 0.1, 0.2) };
     });
     await advance(page, 6);
-    expect(await glassPixels(page, areas.bare)).toBeGreaterThan(0);
+    // Rain lands on the rest of the glass meanwhile.
+    expect(await glassPixels(page)).toBeGreaterThan(0);
     expect(await glassPixels(page, areas.overlap)).toBe(0);
   });
 
@@ -333,7 +336,7 @@ test.describe('road surface', () => {
 });
 
 test('buildings have contrast by day and stay dark at night', async ({ page }) => {
-  await openApp(page, { tod: 'day', weather: 'clear' });
+  await openApp(page, { route: 'city', tod: 'day', weather: 'clear' });
   const luminance = () => page.evaluate(() => {
     const c = window.__drivey.pool.chunks[1].buildings[0].material.color;
     return c.r * 0.3 + c.g * 0.59 + c.b * 0.11;

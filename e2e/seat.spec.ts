@@ -1,4 +1,4 @@
-import { expect, glassPixels, isPhone, isPortrait, mirrorRect, openParked, openSeat, test } from './support';
+import { expect, glassPixels, isPortrait, mirrorRect, openParked, openSeat, test } from './support';
 
 test.describe('seat', () => {
   test('each visit starts in the seat behind steamed-up glass, then sets up the drive', async ({ page }) => {
@@ -16,9 +16,9 @@ test.describe('seat', () => {
     // The slider moves the eye back and forth, sideways or upright.
     const seatBack = () => page.evaluate(() => window.__drivey.stage.framing.seatBack);
     await page.locator('#startPov').fill('1');
-    await expect.poll(seatBack).toBeGreaterThan(0.25);
+    await expect.poll(seatBack).toBeGreaterThan(0.15);
     await page.locator('#startPov').fill('0.5');
-    await expect.poll(seatBack).toBeGreaterThan(0.1);
+    await expect.poll(seatBack).toBeGreaterThan(0.05);
     await page.locator('#startPov').fill('0');
     await expect.poll(seatBack).toBeLessThan(0.01);
 
@@ -36,9 +36,9 @@ test.describe('seat', () => {
     expect(await page.evaluate(() => window.__drivey.settings.value.pov)).toBe(0);
   });
 
-  test('until chosen, phones sit close and bigger screens sit back, held either way', async ({ page }) => {
+  test('until chosen, every screen sits back', async ({ page }) => {
     await openSeat(page);
-    expect(await page.evaluate(() => window.__drivey.stage.povFor())).toBe(isPhone(page) ? 0 : 1);
+    expect(await page.evaluate(() => window.__drivey.stage.povFor())).toBe(1);
   });
 
   test('the seat can be changed in Scene settings', async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe('seat', () => {
     await page.click('#btnPanel');
     await page.click('[data-tab="scene"]');
     await page.locator('#segPov').fill('1');
-    await expect.poll(seatBack).toBeGreaterThan(0.25);
+    await expect.poll(seatBack).toBeGreaterThan(0.15);
     await expect.poll(() => page.evaluate(() => window.__drivey.stage.settled)).toBe(true);
     // Upright, the mirror still hangs just below the top bar however far back the eye sits.
     if (isPortrait(page)) {

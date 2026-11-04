@@ -76,7 +76,7 @@ test.describe('parked on the start screen', () => {
     });
     expect(scene.snow).toBeGreaterThan(0.95);
     expect(scene.side).toBe(-1);
-    await expect(page.locator('#sub')).toHaveText('City expressway · Dusk · Snow');
+    await expect(page.locator('#sub')).toHaveText('Highway · Dusk · Snow');
     // The settings tab's copies of these controls must agree.
     await expect(page.locator('#segWeather button:has-text("Snow")')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#segSide button:has-text("Right")')).toHaveAttribute('aria-pressed', 'true');

@@ -167,12 +167,14 @@ export async function glassPixels(page: Page, rect?: Rect): Promise<number> {
     const canvas = document.querySelector<HTMLCanvasElement>('#glass')!;
     const scale = canvas.width / canvas.clientWidth;
     const x = Math.max(0, Math.floor((r?.left ?? 0) * scale)), y = Math.max(0, Math.floor((r?.top ?? 0) * scale));
-    const w = Math.min(canvas.width - x, Math.ceil(((r?.right ?? canvas.clientWidth) - (r?.left ?? 0)) * scale));
-    const h = Math.min(canvas.height - y, Math.ceil(((r?.bottom ?? canvas.clientHeight) - (r?.top ?? 0)) * scale));
+    // Measured from the clamped corner, so a rect hanging off the screen doesn't spill past its far edge.
+    const w = Math.min(canvas.width, Math.ceil((r?.right ?? canvas.clientWidth) * scale)) - x;
+    const h = Math.min(canvas.height, Math.ceil((r?.bottom ?? canvas.clientHeight) * scale)) - y;
     if (w <= 0 || h <= 0) return 0;
     const d = canvas.getContext('2d')!.getImageData(x, y, w, h).data;
     let n = 0;
-    for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
+    // The wipers are always on the glass, near-black; water and mist are light. The faintest edges round to any colour.
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 8 && d[i - 3] + d[i - 2] + d[i - 1] > 60) n++;
     return n;
   }, rect);
 }

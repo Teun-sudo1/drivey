@@ -2,6 +2,16 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export const BOX = new THREE.BoxGeometry(1, 1, 1);
+/** A unit box drawn in two parts, its front face (material 1) and the rest (material 0), so a button costs two draw calls rather than six. */
+export const CAP_BOX = (() => {
+  const box = new THREE.BoxGeometry(1, 1, 1), index = Array.from(box.index!.array);
+  // The faces run +x, -x, +y, -y, +z, -z, six indices each: move +z to the end.
+  box.setIndex([...index.slice(0, 24), ...index.slice(30), ...index.slice(24, 30)]);
+  box.clearGroups();
+  box.addGroup(0, 30, 0);
+  box.addGroup(30, 6, 1);
+  return box;
+})();
 export const PLANE = new THREE.PlaneGeometry(1, 1);
 /** Long road strips, subdivided so they curve smoothly. */
 export const PLANE_L = new THREE.PlaneGeometry(1, 1, 1, 10);
@@ -34,7 +44,7 @@ export const PALM_FRONDS = mergeGeometries(
   })
 );
 
-const SHARED = new Set<THREE.BufferGeometry>([BOX, PLANE, PLANE_L, BOX_L, TREE_CONE, ROOF_CONE, PALM_TRUNK, PALM_FRONDS]);
+const SHARED = new Set<THREE.BufferGeometry>([BOX, CAP_BOX, PLANE, PLANE_L, BOX_L, TREE_CONE, ROOF_CONE, PALM_TRUNK, PALM_FRONDS]);
 
 /** Frees the GPU buffers of everything under root, except the shared geometries above. */
 export function disposeTree(root: THREE.Object3D): void {
@@ -50,6 +60,16 @@ export function disposeTree(root: THREE.Object3D): void {
  * rather than dozens. Groups stay as they are, so anything shown or hidden as
  * a group still is; meshes in `keep` (ones that change on their own) are left alone.
  */
+/** Moves every mesh nested under `parent` up to be its direct child, in place, so mergeStatic can draw same-material parts together. */
+export function flatten(parent: THREE.Object3D, keep: ReadonlySet<THREE.Object3D> = new Set()): void {
+  parent.updateMatrixWorld(true);
+  const nested: THREE.Mesh[] = [];
+  parent.traverse(o => {
+    if (o instanceof THREE.Mesh && o.parent !== parent && !keep.has(o)) nested.push(o);
+  });
+  for (const m of nested) parent.attach(m);
+}
+
 export function mergeStatic(root: THREE.Object3D, keep: ReadonlySet<THREE.Object3D> = new Set()): void {
   const groups: THREE.Object3D[] = [];
   root.traverse(o => {

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { advance, expect, isPhone, openApp, openParked, test } from './support';
+import { advance, expect, isPhone, isPortrait, openApp, openParked, test } from './support';
 
 type Point = { x: number; y: number };
 
@@ -33,6 +33,8 @@ const at = (f: { from: Point; to: Point }, t: number) => ({ x: f.from.x + (f.to.
 const music = (page: Page) => page.evaluate(() => window.__drivey.settings.value.mix.music);
 
 test.describe('dashboard radio', () => {
+  // Upright, the radio sits off to the side, as in the car; the driver looks round to reach it.
+  test.beforeEach(({ page }) => test.skip(isPortrait(page), 'upright, the radio is out of view until the driver looks round'));
   test('the preset buttons change station, and the needle slides to it', async ({ page }) => {
     await openApp(page, { style: 'chillhop' });
     const r = await radio(page);

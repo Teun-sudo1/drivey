@@ -67,10 +67,10 @@ const STORAGE_KEY = 'nd.settings';
 
 function defaults(): Settings {
   return {
-    route: 'city',
+    route: 'highway',
     driveSide: 'left',
     tod: 'night',
-    weather: 'rain',
+    weather: 'clear',
     bloom: true,
     vignette: true,
     grain: true,
