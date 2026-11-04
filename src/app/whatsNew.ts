@@ -2,7 +2,7 @@
 export const RELEASES = [
   {
     id: '2026-11-04',
-    notes: 'A new 80s interior with real knobs and buttons, rain and mist on the windshield itself, realistic wipers, A/C that keeps the glass clear, drag to look around the car, a Start driving button, an optional frame rate counter, and a new app icon.'
+    notes: 'A new 80s interior with real knobs and buttons, rain and mist on the windshield itself, realistic wipers, A/C that keeps the glass clear, drag to look around the car, an optional frame rate counter, and a new app icon.'
   },
   {
     id: '2026-11-03',

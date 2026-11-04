@@ -32,6 +32,8 @@ export interface Windshield {
 
   /** Steams the glass up, or clears it as the demister would; instantly skips the easing. */
   setMisted(misted: boolean, instantly?: boolean): void;
+  /** How steamed up the glass is, 0 to 1, and how dark it is outside, for the side windows to match. */
+  readonly misted: { level: number; dark: number };
 }
 
 interface Drop {
@@ -196,6 +198,10 @@ class CanvasWindshield implements Windshield {
     const target = this.airCon ? 0 : weather.veil + inside;
     this.veil = lerp(this.veil, target, damp(target > this.veil ? FOG_UP_RATE : VEIL_RATE, dt));
     this.mist = Math.abs(this.mist - this.mistTarget) < 0.002 ? this.mistTarget : lerp(this.mist, this.mistTarget, damp(DEMIST_RATE, dt));
+  }
+
+  get misted(): { level: number; dark: number } {
+    return { level: this.mist, dark: this.dark };
   }
 
   setMisted(misted: boolean, instantly = false): void {

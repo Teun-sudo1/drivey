@@ -38,6 +38,8 @@ const PILLAR_ENDS: [THREE.Vector3, THREE.Vector3, number][] = [
 ];
 /** How far the fan knob turns either way, and half the temperature slot's length, local to the climate panel. */
 const FAN_STOP = 2.4, TEMP_SLOT = 0.0283;
+/** How far back the steamed-up side windows reach: past the eye sat all the way back. */
+const SIDE_PANE_END = 0.6;
 /** How far back of the wheel the eye sits, on average across the seat range, for fitting the glass to the pillars. */
 const GLASS_EYE_BACK = 0.1;
 /** Where the roof's front edge runs, above the windshield, and how far up each pillar starts sweeping into it. */
@@ -90,6 +92,8 @@ export class Cockpit {
   private readonly headTurn = new THREE.Euler();
   private readonly climate = createClimate();
   /** The headlamp lenses at the front of the wings, lit with the headlights. */
+  private readonly sideMist = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
+  private readonly sidePanes: THREE.Mesh[] = [];
   private readonly lampGlass = new THREE.MeshBasicMaterial({ color: 0x555049, toneMapped: false });
   /** One chrome for the badge, pedals, door pull and wheel trim, so the parts share draw calls. */
   private readonly chrome = new THREE.MeshStandardMaterial({ color: 0xb8bac0, roughness: 0.25, metalness: 0.9 });
@@ -310,6 +314,28 @@ export class Cockpit {
     panel.renderOrder = 1;
     this.root.add(panel);
     hideFromReflection(panel);
+    // The side windows, from each pillar back past the eye, between the sill and the roof.
+    for (const [foot, head, outward] of PILLAR_ENDS) {
+      const x = (p: THREE.Vector3) => p.x + outward * inset;
+      const pane = new THREE.BufferGeometry();
+      pane.setAttribute('position', new THREE.Float32BufferAttribute([
+        x(foot), foot.y, foot.z, x(head), head.y, head.z, x(head), head.y, SIDE_PANE_END, x(foot), foot.y, SIDE_PANE_END
+      ], 3));
+      pane.setIndex([0, 1, 2, 0, 2, 3]);
+      const mesh = new THREE.Mesh(pane, this.sideMist);
+      mesh.renderOrder = 1;
+      mesh.visible = false;
+      this.root.add(mesh);
+      hideFromReflection(mesh);
+      this.sidePanes.push(mesh);
+    }
+  }
+
+  /** Steams the side windows up with the windshield while the driver settles in, so they don't give the drive away either. */
+  setSideMist({ level, dark }: { level: number; dark: number }): void {
+    for (const pane of this.sidePanes) pane.visible = level > 0;
+    this.sideMist.opacity = level;
+    this.sideMist.color.setRGB(lerp(0.52, 0.14, dark), lerp(0.55, 0.15, dark), lerp(0.6, 0.18, dark), THREE.SRGBColorSpace);
   }
 
   /** Turns the fan knob by a drag, within its stops. */

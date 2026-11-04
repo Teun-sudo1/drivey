@@ -449,6 +449,7 @@ function simulate(dt: number): void {
   shelter = 1 - open;
   particles.update({ dt, speed: drive.speed, clock: drive.clock, rain: environment.rainLevel * open, snow: environment.snowLevel * open, reducedMotion: s.reduced });
   windshield.update({ dt, speed: drive.speed, weather: WEATHERS[s.weather], lamp: environment.lampLevel, wipersOn: ignitionOn, shelter: 1 - open });
+  cockpit.setSideMist(windshield.misted);
   roadSurface.setLevels(environment.wetLevel, environment.snowLevel, environment.headlightLevel);
   roadSurface.setShelters(shelters);
 }
