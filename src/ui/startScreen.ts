@@ -31,6 +31,9 @@ export function createStartScreen(engine: CarEngine, settled: (instantly: boolea
     settled(instantly);
     showStep('setup');
   };
+  // The opening screen stays up until Start, then gives way to the car.
+  const intro = $('#intro');
+  $('#btnIntro').addEventListener('click', () => intro.classList.add('gone'));
   $('#btnSeated').addEventListener('click', () => settle());
   $('#btnGetIn').addEventListener('click', () => {
     showStep('key');
@@ -51,6 +54,7 @@ export function createStartScreen(engine: CarEngine, settled: (instantly: boolea
   return {
     settle,
     skip: () => {
+      intro.classList.add('gone');
       settle(true);
       engine.set('running');
     }

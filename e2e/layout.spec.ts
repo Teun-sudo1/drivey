@@ -96,9 +96,9 @@ test.describe('layout', () => {
   });
 });
 
-test('the setup card notes the latest release, and Stats lists them all', async ({ page }) => {
+test('the opening screen tells the latest release, and Stats lists them all', async ({ page }) => {
   await openParked(page);
-  await expect(page.locator('#startNews')).toContainText(RELEASES[0].notes);
+  await expect(page.locator('#introNews')).toContainText(RELEASES[0].notes);
   await page.evaluate(() => window.__drivey.startScreen.skip());
   await page.click('#btnPanel');
   await page.click('[data-tab="stats"]');

@@ -109,15 +109,18 @@ body.reduced #start.cranking #ignition svg { animation: none; }
   75% { transform: translate(1.5px, -1px); }
 }
 
-/* On opening: the dusk sky fades up behind the glowing name, then gives way to the car. Taps pass straight through. */
-#intro { position: fixed; inset: 0; z-index: 100; pointer-events: none; display: grid; place-items: center; background: linear-gradient(#1c2346, #b0566a 55%, #ffb070); animation: intro-out .7s ease-in 1.5s forwards; }
-#intro::before { content: ''; position: absolute; inset: 0; background: #000; animation: intro-in .8s ease-out forwards; }
+/* On opening: the dusk sky fades up behind the glowing name and the latest news, until Start lets the car show. */
+#intro { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; align-content: center; gap: 28px; padding: 24px; background: linear-gradient(#1c2346, #b0566a 55%, #ffb070); transition: opacity .7s ease-in, visibility 0s .7s; }
+#intro.gone { opacity: 0; visibility: hidden; }
+#intro::before { content: ''; position: absolute; inset: 0; background: #000; pointer-events: none; animation: intro-in .8s ease-out forwards; }
 #intro h1 { position: relative; font-family: var(--mono); font-weight: 400; font-size: clamp(40px, 9vw, 84px); letter-spacing: .14em; color: #ffd8b0; text-shadow: 0 0 32px rgba(255, 160, 80, .6); opacity: 0; animation: intro-word .6s ease-out .2s forwards; }
+#intro .start-go { position: relative; width: min(260px, 70vw); margin: 0; opacity: 0; animation: intro-word .6s ease-out .5s forwards; }
+.intro-news { position: absolute; top: calc(20px + var(--st)); left: 50%; transform: translateX(-50%); width: min(560px, 88vw); text-align: center; font-size: 13px; line-height: 1.45; color: rgba(255, 230, 205, .85); opacity: 0; animation: intro-word .6s ease-out .4s forwards; }
 @keyframes intro-in { to { opacity: 0; } }
 @keyframes intro-word { to { opacity: 1; } }
-@keyframes intro-out { to { opacity: 0; visibility: hidden; } }
-@media (prefers-reduced-motion: reduce) { #intro { display: none; } }
-body.reduced #intro { display: none; }
+body.reduced #intro, body.reduced #intro::before, body.reduced #intro * { animation: none; opacity: 1; transition: none; }
+body.reduced #intro::before { opacity: 0; }
+body.reduced #intro.gone { opacity: 0; }
 
 /* The optional frame-rate counter, small and out of the way. */
 #fps { position: fixed; z-index: 9; left: calc(10px + var(--sl, 0px)); bottom: calc(10px + var(--sb, 0px)); padding: 3px 8px; border-radius: 6px; background: rgba(0, 0, 0, .55); color: #ffbe78; font: 12px var(--mono); pointer-events: none; }

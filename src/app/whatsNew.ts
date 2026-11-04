@@ -1,4 +1,4 @@
-/** What changed in each release, newest first: the latest shows under the setup card, and all are listed under Stats. */
+/** What changed in each release, newest first: the latest shows on the opening screen, and all are listed under Stats. */
 export const RELEASES = [
   {
     id: '2026-11-04',
@@ -16,7 +16,7 @@ export const RELEASES = [
 
 const dateOf = (id: string): string => new Date(id).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
 
-/** Lists every release, newest first, into the changelog under Stats, and the latest at the foot of the setup card. */
+/** Lists every release, newest first, into the changelog under Stats, and the latest at the top of the opening screen. */
 export function renderChangelog(list: HTMLElement, latest: HTMLElement): void {
   latest.textContent = `New · ${dateOf(RELEASES[0].id)}: ${RELEASES[0].notes}`;
   list.replaceChildren(...RELEASES.map(({ id, notes }) => {

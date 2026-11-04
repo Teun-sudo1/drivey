@@ -54,7 +54,7 @@ import { renderChangelog } from './app/whatsNew';
 
 
 const platform = getPlatform();
-renderChangelog($('#changelog'), $('#startNews'));
+renderChangelog($('#changelog'), $('#introNews'));
 const settings = await SettingsStore.load(platform.storage);
 
 /* Scene */

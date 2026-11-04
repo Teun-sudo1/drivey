@@ -79,13 +79,14 @@ export async function openApp(page: Page, settings: Record<string, unknown> = {}
   await page.evaluate(() => window.__drivey.startScreen.skip());
 }
 
-/** Opens the app as a visitor does: parked, in the seat behind steamed-up glass. */
+/** Opens the app as a visitor does: past the opening screen, parked in the seat behind steamed-up glass. */
 export async function openSeat(page: Page, settings: Record<string, unknown> = {}): Promise<void> {
   await page.addInitScript(s => {
     if (!localStorage.getItem('nd.settings')) localStorage.setItem('nd.settings', JSON.stringify(s));
   }, { bloom: false, grain: false, vignette: false, tipsSeen: true, ...settings });
   await page.goto('./');
   await waitForFrames(page);
+  await page.click('#btnIntro');
 }
 
 /** Opens the app settled in, parked on the setup screen. */
