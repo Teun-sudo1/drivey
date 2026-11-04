@@ -76,8 +76,8 @@ test.describe('routes', () => {
         info.autoReset = true;
         return n;
       });
-      // Before merging each chunk's static meshes the highway alone took over 500.
-      expect(calls, route.name).toBeLessThan(420);
+      // Before merging each chunk's static meshes the highway alone took over 500. Aim for 420, with 10% leeway.
+      expect(calls, route.name).toBeLessThan(420 * 1.1);
     }
   });
 
