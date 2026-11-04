@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createCanvas } from '../lib/canvas';
+import { createCanvas, fogPatches } from '../lib/canvas';
 import { damp, lerp, rand } from '../lib/math';
 import type { LampTint } from '../routes/types';
 import type { Weather } from './tables';
@@ -32,8 +32,8 @@ export interface Windshield {
 
   /** Steams the glass up, or clears it as the demister would; instantly skips the easing. */
   setMisted(misted: boolean, instantly?: boolean): void;
-  /** How steamed up the glass is, 0 to 1, and how dark it is outside, for the side windows to match. */
-  readonly misted: { level: number; dark: number };
+  /** How steamed up the glass is, 0 to 1, how dark it is outside, and how fogged, for the side windows and mirror to match. */
+  readonly misted: { level: number; dark: number; fog: number };
 }
 
 interface Drop {
@@ -142,6 +142,7 @@ class CanvasWindshield implements Windshield {
   };
   private readonly flake = flakeSprite();
   private readonly beads = condensation();
+  private readonly patches = fogPatches(GLASS_W, GLASS_H);
   /** How dark it is outside, from the streetlight level, so the steamed-up glass isn't bright at night. */
   private dark = 0;
   readonly texture: THREE.CanvasTexture;
@@ -200,8 +201,8 @@ class CanvasWindshield implements Windshield {
     this.mist = Math.abs(this.mist - this.mistTarget) < 0.002 ? this.mistTarget : lerp(this.mist, this.mistTarget, damp(DEMIST_RATE, dt));
   }
 
-  get misted(): { level: number; dark: number } {
-    return { level: this.mist, dark: this.dark };
+  get misted(): { level: number; dark: number; fog: number } {
+    return { level: this.mist, dark: this.dark, fog: this.veil };
   }
 
   setMisted(misted: boolean, instantly = false): void {
@@ -311,8 +312,12 @@ class CanvasWindshield implements Windshield {
     // Outside the glass, so under everything on it: the film, mist and drops all lie between the eye and the blades.
     this.drawWipers();
     if (this.veil > 0.001) {
-      g.fillStyle = `rgba(190,200,212,${this.veil})`;
+      // A thin film everywhere, and thicker patches over it, as fog never forms evenly.
+      g.fillStyle = `rgba(190,200,212,${this.veil * 0.5})`;
       g.fillRect(0, 0, this.width, this.bottom);
+      g.globalAlpha = Math.min(1, this.veil * 1.6);
+      g.drawImage(this.patches, 0, 0);
+      g.globalAlpha = 1;
     }
     if (this.mist > 0) this.drawMist();
     this.drawTrails();

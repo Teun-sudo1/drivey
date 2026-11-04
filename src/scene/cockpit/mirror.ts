@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { colorTexture, createCanvas } from '../../lib/canvas';
+import { colorTexture, createCanvas, fogPatches } from '../../lib/canvas';
 import { clamp } from '../../lib/math';
 import type { MirrorLamps } from '../../routes/types';
 import { BOX, mesh } from '../geometry';
@@ -103,6 +103,9 @@ export class Mirror {
   private snow = 0;
   private fogVeil = 0;
   private drawTimer = DRAW_INTERVAL;
+  /** The rear window fogging up, seen in the mirror. */
+  private steam = 0;
+  private readonly patches = fogPatches(CANVAS_W, CANVAS_H);
   private travelled = 0;
   private clock = 0;
   private lampSpacing = Infinity;
@@ -250,8 +253,18 @@ export class Mirror {
     g.closePath();
   }
 
+  /** Fogs the rear window behind the mirror along with the windshield. */
+  setFog(level: number): void {
+    this.steam = Math.min(1, level * 1.6);
+  }
+
   private drawWeather(): void {
     const g = this.ctx, w = CANVAS_W, h = CANVAS_H;
+    if (this.steam > 0.01) {
+      g.globalAlpha = this.steam;
+      g.drawImage(this.patches, 0, 0, w, h);
+      g.globalAlpha = 1;
+    }
     if (this.fogVeil > 0.01) {
       g.fillStyle = `rgba(${this.fogColor.r * 255},${this.fogColor.g * 255},${this.fogColor.b * 255},${this.fogVeil})`;
       g.fillRect(0, 0, w, h);

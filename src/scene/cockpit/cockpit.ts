@@ -3,6 +3,7 @@ import type { EngineState } from '../../app/carEngine';
 import { damp, lerp } from '../../lib/math';
 import { hideFromReflection } from '../roadSurface';
 import { BOX, CAP_BOX, PLANE, flatten, mergeStatic, mesh } from '../geometry';
+import { colorTexture, fogPatches, sideDrops } from '../../lib/canvas';
 import { createGauges } from './gauges';
 import { createClimate } from './climate';
 import { createLcd } from './lcd';
@@ -38,6 +39,8 @@ const PILLAR_ENDS: [THREE.Vector3, THREE.Vector3, number][] = [
 ];
 /** How far the fan knob turns either way, and half the temperature slot's length, local to the climate panel. */
 const FAN_STOP = 2.4, TEMP_SLOT = 0.0283;
+/** How fast drops on the side windows drift back, in texture widths per metre driven. */
+const SIDE_RAIN_DRIFT = 0.004;
 /** How far back the steamed-up side windows reach: past the eye sat all the way back. */
 const SIDE_PANE_END = 0.6;
 /** How far back of the wheel the eye sits, on average across the seat range, for fitting the glass to the pillars. */
@@ -94,6 +97,11 @@ export class Cockpit {
   /** The headlamp lenses at the front of the wings, lit with the headlights. */
   private readonly sideMist = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
   private readonly sidePanes: THREE.Mesh[] = [];
+  private readonly sideFog = colorTexture(fogPatches(256, 256));
+  /** Rain on the side windows, blown back along the glass as the car goes. */
+  private readonly sideRainTexture = Object.assign(colorTexture(sideDrops(256)), { wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, repeat: new THREE.Vector2(5, 3) });
+  private readonly sideRain = new THREE.MeshBasicMaterial({ map: this.sideRainTexture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, opacity: 0 });
+  private readonly rainPanes: THREE.Mesh[] = [];
   private readonly lampGlass = new THREE.MeshBasicMaterial({ color: 0x555049, toneMapped: false });
   /** One chrome for the badge, pedals, door pull and wheel trim, so the parts share draw calls. */
   private readonly chrome = new THREE.MeshStandardMaterial({ color: 0xb8bac0, roughness: 0.25, metalness: 0.9 });
@@ -321,6 +329,7 @@ export class Cockpit {
       pane.setAttribute('position', new THREE.Float32BufferAttribute([
         x(foot), foot.y, foot.z, x(head), head.y, head.z, x(head), head.y, SIDE_PANE_END, x(foot), foot.y, SIDE_PANE_END
       ], 3));
+      pane.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0, 1, 1, 1, 1, 0], 2));
       pane.setIndex([0, 1, 2, 0, 2, 3]);
       const mesh = new THREE.Mesh(pane, this.sideMist);
       mesh.renderOrder = 1;
@@ -328,14 +337,32 @@ export class Cockpit {
       this.root.add(mesh);
       hideFromReflection(mesh);
       this.sidePanes.push(mesh);
+      const rain = new THREE.Mesh(pane, this.sideRain);
+      rain.renderOrder = 1;
+      rain.visible = false;
+      this.root.add(rain);
+      hideFromReflection(rain);
+      this.rainPanes.push(rain);
     }
   }
 
   /** Steams the side windows up with the windshield while the driver settles in, so they don't give the drive away either. */
-  setSideMist({ level, dark }: { level: number; dark: number }): void {
-    for (const pane of this.sidePanes) pane.visible = level > 0;
-    this.sideMist.opacity = level;
+  setSideMist({ level, dark, fog }: { level: number; dark: number; fog: number }): void {
+    // Steamed up while settling in; fogged in patches, like the windshield, when the A/C is off in the wet.
+    const shown = Math.max(level, Math.min(1, fog * 1.6));
+    for (const pane of this.sidePanes) pane.visible = shown > 0.01;
+    this.sideMist.opacity = shown;
+    this.sideMist.map = level > fog ? null : this.sideFog;
+    this.sideMist.needsUpdate = true;
+    this.mirror.setFog(fog);
     this.sideMist.color.setRGB(lerp(0.52, 0.14, dark), lerp(0.55, 0.15, dark), lerp(0.6, 0.18, dark), THREE.SRGBColorSpace);
+  }
+
+  /** Rain on the side windows, as heavy as it falls, drifting back faster the quicker the car goes. */
+  setSideRain(level: number, speed: number, dt: number): void {
+    for (const pane of this.rainPanes) pane.visible = level > 0.01;
+    this.sideRain.opacity = Math.min(1, level * 1.4);
+    this.sideRainTexture.offset.x = (this.sideRainTexture.offset.x + speed * dt * SIDE_RAIN_DRIFT) % 1;
   }
 
   /** Turns the fan knob by a drag, within its stops. */
