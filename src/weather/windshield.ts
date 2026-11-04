@@ -58,7 +58,7 @@ const FLAKE_MELT_RATE = 0.06;
 const VEIL_RATE = 1.1;
 /** How quickly the glass clears once a seat is picked. */
 const DEMIST_RATE = 1.6;
-const GLASS_LOWER_EDGE = [-1.2, -0.35, 0.6];
+const GLASS_LOWER_EDGE = [-1.4, -0.26, 0.9];
 const RUNNING_DROP_RADIUS = 3.4;
 const MAX_TRAIL = 110;
 /** How far behind the blade its wet smear reaches, in radians. */
@@ -137,6 +137,7 @@ class CanvasWindshield implements Windshield {
     private readonly roof: THREE.Object3D,
     private readonly occluders: readonly GlassOccluder[],
     private readonly sideWindows: readonly GlassOccluder[],
+    private readonly pillars: readonly GlassOccluder[],
     private lampTint: LampTint
   ) {
     const ctx = canvas.getContext('2d');
@@ -325,6 +326,20 @@ class CanvasWindshield implements Windshield {
   /** Rain stays off the side windows, but they steam up along with the windshield. */
   private mistSideWindows(): void {
     const g = this.ctx;
+    g.save();
+    // Not over the parts of the cabin in front of it, such as the nav screen; the pillars are where the side glass starts.
+    for (const { object, points } of this.occluders) {
+      if (this.pillars.some(p => p.points === points)) continue;
+      g.beginPath();
+      g.rect(0, 0, this.width, this.height);
+      points.forEach((p, i) => {
+        const s = this.project(p.x, p.y, p.z, object);
+        if (i === 0) g.moveTo(s.x, s.y);
+        else g.lineTo(s.x, s.y);
+      });
+      g.closePath();
+      g.clip('evenodd');
+    }
     g.fillStyle = `rgba(110,118,130,${this.mist})`;
     for (const { object, points } of this.sideWindows) {
       g.beginPath();
@@ -336,6 +351,7 @@ class CanvasWindshield implements Windshield {
       g.closePath();
       g.fill();
     }
+    g.restore();
   }
 
   /** Between roof and dash, minus whatever sits inside the car in front of the glass. */
@@ -435,7 +451,8 @@ export function createWindshield(
   roof: THREE.Object3D,
   occluders: readonly GlassOccluder[],
   sideWindows: readonly GlassOccluder[],
+  pillars: readonly GlassOccluder[],
   lampTint: LampTint
 ): Windshield {
-  return new CanvasWindshield(canvas, camera, roof, occluders, sideWindows, lampTint);
+  return new CanvasWindshield(canvas, camera, roof, occluders, sideWindows, pillars, lampTint);
 }

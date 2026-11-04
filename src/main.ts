@@ -76,7 +76,7 @@ engine.onChange(state => {
   if (state === 'running') showTipsOnce(settings);
 });
 const environment = new Environment(stage, lights, postfx, cockpit, backdrop, particles);
-const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera, cockpit.roof, cockpit.glassOccluders, cockpit.sideWindows, route.lampTint);
+const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera, cockpit.roof, cockpit.glassOccluders, cockpit.sideWindows, cockpit.pillars, route.lampTint);
 settings.onChange(() => stage.setPov(settings.value.pov));
 stage.setPov(settings.value.pov, true);
 // Each visit starts by settling into the seat behind steamed-up glass, so the scenery is a surprise.
@@ -346,8 +346,14 @@ function simulate(dt: number): void {
   roadSurface.setShelters(shelters);
 }
 
+/** Whether the indicator was lit last frame, so the relay clicks on each change. */
+let indicatorLit = false;
 startLoop(dt => {
   simulate(dt);
+  if (cockpit.indicatorLit !== indicatorLit) {
+    indicatorLit = cockpit.indicatorLit;
+    effects.tick(indicatorLit);
+  }
   watchFrames(dt);
   const s = settings.value;
   // Once a frame rather than per simulated step, as each call schedules audio changes.

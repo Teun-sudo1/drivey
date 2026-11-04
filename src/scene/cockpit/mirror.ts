@@ -70,6 +70,15 @@ function faceGeometry(): THREE.ShapeGeometry {
   return g;
 }
 
+/** The housing's rounded rectangle as a polygon, so the glass shows right up to its curved corners. */
+function roundedOutline(hw: number, hh: number, r: number): THREE.Vector3[] {
+  const corners: [number, number][] = [[hw - r, -hh + r], [hw - r, hh - r], [-hw + r, hh - r], [-hw + r, -hh + r]];
+  return corners.flatMap(([cx, cy], k) => Array.from({ length: 5 }, (_, i) => {
+    const a = ((k - 1) + i / 4) * (Math.PI / 2);
+    return new THREE.Vector3(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 0);
+  }));
+}
+
 function quad(x0: number, x1: number, y0: number, y1: number): THREE.Vector3[] {
   return [new THREE.Vector3(x0, y0, 0), new THREE.Vector3(x1, y0, 0), new THREE.Vector3(x1, y1, 0), new THREE.Vector3(x0, y1, 0)];
 }
@@ -123,7 +132,7 @@ export class Mirror {
     const hw = (WIDTH + HOUSING_MARGIN) / 2, hh = (HEIGHT + HOUSING_MARGIN) / 2;
     this.stemOutline = quad(-STEM_WIDTH / 2, STEM_WIDTH / 2, HEIGHT / 2, HEIGHT / 2);
     this.occluders = [
-      { object: group, points: quad(-hw, hw, -hh, hh) },
+      { object: group, points: roundedOutline(hw, hh, RADIUS + HOUSING_MARGIN / 2) },
       { object: group, points: this.stemOutline }
     ];
   }

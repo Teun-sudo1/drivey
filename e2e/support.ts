@@ -148,19 +148,14 @@ export async function mirrorInnerRect(page: Page): Promise<Rect> {
     const { cockpit, stage } = window.__drivey;
     stage.camera.updateMatrixWorld(true);
     const { object, points } = cockpit.mirror.occluders[0];
-    // Corners run bottom left, bottom right, top right, top left.
-    const [bl, br, tr, tl] = points.map((p: any) => {
+    const screen = points.map((p: any) => {
       const v = object.localToWorld(p.clone()).project(stage.camera);
       return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
     });
-    // Generous, because on a slow machine the glass can be a frame behind this measurement.
-    const inset = 8;
-    return {
-      left: Math.max(bl.x, tl.x) + inset,
-      right: Math.min(br.x, tr.x) - inset,
-      top: Math.max(tl.y, tr.y) + inset,
-      bottom: Math.min(bl.y, br.y) - inset
-    };
+    const xs = screen.map((s: any) => s.x), ys = screen.map((s: any) => s.y);
+    // Generous, for the rounded corners, the slant and a glass a frame behind on a slow machine.
+    const inset = 14;
+    return { left: Math.min(...xs) + inset, right: Math.max(...xs) - inset, top: Math.min(...ys) + inset, bottom: Math.max(...ys) - inset };
   });
 }
 

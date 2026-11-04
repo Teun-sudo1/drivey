@@ -65,6 +65,22 @@ export class Effects {
    * A dashboard switch: a soft plastic click with a little body under it. Start sounds
    * a touch higher than the others, so starting and stopping are told apart by ear.
    */
+  /** The indicator relay: a sharp tick as the lamp lights, a softer tock as it goes out. */
+  tick(lit: boolean): void {
+    const graph = this.audio.graph;
+    if (!graph) return;
+    const { ctx, master, noise } = graph;
+    const t = ctx.currentTime;
+    const source = ctx.createBufferSource(), g = ctx.createGain();
+    source.buffer = noise.white;
+    g.gain.setValueAtTime(lit ? 0.22 : 0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.018);
+    source.connect(filter(ctx, 'bandpass', lit ? 3200 : 1700, 4)).connect(g);
+    g.connect(master);
+    source.start(t, Math.random());
+    source.stop(t + 0.025);
+  }
+
   press(start: boolean): void {
     const graph = this.audio.graph;
     if (!graph) return;

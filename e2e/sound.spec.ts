@@ -39,6 +39,27 @@ test.describe('sound', () => {
     await expect.poll(master, { timeout: 4000 }).toBeGreaterThan(0.5);
   });
 
+  test('the indicator ticks in time with its lamp while signalling, and is quiet otherwise', async ({ page }) => {
+    await openParked(page, { route: 'highway' });
+    await page.click('#startTod button:has-text("Dusk")');
+    await page.evaluate(() => {
+      const d = window.__drivey;
+      d.startScreen.skip();
+      (window as any).ticks = [];
+      const tick = d.effects.tick.bind(d.effects);
+      d.effects.tick = (lit: boolean) => ((window as any).ticks.push(lit), tick(lit));
+    });
+    await page.waitForTimeout(1500);
+    expect(await page.evaluate(() => (window as any).ticks.length)).toBe(0);
+    // About to move over: signalling, held there.
+    await page.evaluate(() => Object.assign(window.__drivey.traffic.own, { pending: 3.2, signalLeft: 99 }));
+    await page.waitForTimeout(2500);
+    const ticks: boolean[] = await page.evaluate(() => (window as any).ticks);
+    // Tick, tock, tick... about 1.5 flashes a second.
+    expect(ticks.length).toBeGreaterThanOrEqual(5);
+    ticks.forEach((lit, i) => expect(lit).toBe(i % 2 === 0));
+  });
+
   test('the starter turns over while cranking, then the engine hums', async ({ page }) => {
     await openParked(page, { weather: 'clear' });
     await page.click('#btnGetIn');

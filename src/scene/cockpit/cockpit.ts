@@ -29,8 +29,8 @@ const CABIN_FADE_RATE = 2.5;
 const BLINK_HZ = 1.5;
 /** Each A-pillar's foot and head, and which way is out of the car. */
 const PILLAR_ENDS: [THREE.Vector3, THREE.Vector3, number][] = [
-  [new THREE.Vector3(-1.25, -0.47, -1.38), new THREE.Vector3(-0.98, 0.5, -0.78), -1],
-  [new THREE.Vector3(0.66, -0.47, -1.38), new THREE.Vector3(0.52, 0.5, -0.78), 1]
+  [new THREE.Vector3(-1.5, -0.47, -1.38), new THREE.Vector3(-1.2, 0.5, -0.78), -1],
+  [new THREE.Vector3(0.98, -0.47, -1.38), new THREE.Vector3(0.82, 0.5, -0.78), 1]
 ];
 /** The door sill, where the side windows start. */
 const SILL_Y = -0.42;
@@ -99,9 +99,9 @@ export class Cockpit {
     // Everything fixed in place, merged by material once built so the whole cabin costs a few draw calls.
     const cabin = new THREE.Group();
     root.add(cabin);
-    mesh(BOX, intA, -0.35, -0.69, -1.16, 2.5, 0.44, 0.42, cabin);
-    mesh(BOX, intA, -0.35, -0.86, -0.85, 2.5, 0.3, 0.3, cabin);
-    mesh(BOX, intB, -0.35, -0.48, -1.4, 2.6, 0.04, 0.12, cabin);
+    mesh(BOX, intA, -0.26, -0.69, -1.16, 2.9, 0.44, 0.42, cabin);
+    mesh(BOX, intA, -0.26, -0.86, -0.85, 2.9, 0.3, 0.3, cabin);
+    mesh(BOX, intB, -0.26, -0.48, -1.4, 3.0, 0.04, 0.12, cabin);
     mesh(BOX, intB, 0, -0.285, -0.95, 0.58, 0.04, 0.14, cabin).rotation.x = 0.18;
     mesh(BOX, intB, 0, -0.4, -0.92, 0.58, 0.19, 0.05, cabin);
 
@@ -134,7 +134,8 @@ export class Cockpit {
 
     root.add(this.roof);
     // Deep enough to cover the eye when it sits back from the wheel.
-    mesh(BOX, intB, -0.35, 0.52, -0.35, 2.8, 0.07, 1.5, this.roof);
+    // Just reaching the pillars' heads, so it never sticks out past the car's sides.
+    mesh(BOX, intB, -0.19, 0.52, -0.35, 2.06, 0.07, 1.5, this.roof);
     this.mirror = new Mirror(root, intB);
     this.screens.push(this.radio.face);
 
@@ -164,6 +165,8 @@ export class Cockpit {
       ...this.mirror.occluders,
       ...this.pillars,
       { object: this.radio.group, points: this.radio.outline },
+      // The wheel's rim rises above the dash, most of all when sitting back.
+      { object: this.wheel, points: Array.from({ length: 16 }, (_, i) => V(Math.cos((i / 16) * Math.PI * 2) * 0.225, Math.sin((i / 16) * Math.PI * 2) * 0.225, 0)) },
       { object: navUnit, points: [V(-0.1, -0.145, 0), V(0.1, -0.145, 0), V(0.1, 0.145, 0), V(-0.1, 0.145, 0)] },
       { object: root, points: [V(-0.29, -0.265, -1.02), V(0.29, -0.265, -1.02), V(0.29, -0.5, -0.9), V(-0.29, -0.5, -0.9)] }
     ];
@@ -185,6 +188,11 @@ export class Cockpit {
   /** Sizes the gauges for the framing, keeping them mirrored with the interior. */
   scaleGauges(scale: number): void {
     this.gaugeScreen.scale.set(scale * this.side, scale, 1);
+  }
+
+  /** Whether an indicator lamp is lit at this moment. */
+  get indicatorLit(): boolean {
+    return this.blinkers[0].visible || this.blinkers[1].visible;
   }
 
   /** Which way the indicator is on, as Traffic.ownSignal gives it; it blinks in that side's door mirror. */
@@ -284,11 +292,11 @@ export class Cockpit {
 
   /** Doors, floor, the console between the seats, and the passenger's side of the dash. */
   private addCabin(cabin: THREE.Group, panel: THREE.Material, trim: THREE.Material): void {
-    for (const x of [-1.3, 0.72]) {
+    for (const x of [-1.55, 1.04]) {
       mesh(BOX, panel, x, -0.76, -0.4, 0.08, 0.62, 2.2, cabin);
       mesh(BOX, trim, x + Math.sign(x + 0.35) * -0.02, -0.44, -0.4, 0.12, 0.04, 2.2, cabin);
     }
-    mesh(BOX, trim, -0.29, -1.06, -0.4, 2.05, 0.04, 2.2, cabin);
+    mesh(BOX, trim, -0.26, -1.06, -0.4, 2.6, 0.04, 2.2, cabin);
     mesh(BOX, trim, -0.36, -0.82, -0.3, 0.22, 0.38, 1.1, cabin);
     mesh(BOX, panel, -0.36, -0.62, 0.02, 0.2, 0.05, 0.36, cabin);
     // The passenger's side of the dash: a glovebox with its catch, and an air vent at the end.
