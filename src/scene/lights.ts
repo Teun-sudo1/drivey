@@ -9,7 +9,7 @@ export interface SceneLights {
 
 /** Half the distance between the headlamps, and how far apart their beams aim, 60 m out. */
 const LAMP_SPREAD = 0.65;
-const LAMP_TOE = 1.6;
+const LAMP_TOE = 0.4;
 
 /** Keeps the headlights on our car: its side of the road, and any lane change, as a world x shift. */
 export function placeHeadlights(lights: SceneLights, side: number, offset: number): void {
@@ -28,7 +28,7 @@ export function createLights(scene: THREE.Scene): SceneLights {
   sun.position.set(-60, 80, -120);
   const headlights = [-LAMP_SPREAD, LAMP_SPREAD].map(dx => {
     // Narrower and crisper-edged than one big beam, so each lamp's pool reads on its own.
-    const lamp = new THREE.SpotLight(0xfff0d8, 0, 110, 0.36, 0.5, 1.35);
+    const lamp = new THREE.SpotLight(0xfff0d8, 0, 110, 0.3, 0.9, 1.35);
     // At the lamps, at the front of the bonnet, so the beams fall on the road and not on the car.
     lamp.position.set(-0.4 + dx, 0.5, -4.15);
     lamp.target.position.set(-0.6 + dx + Math.sign(dx) * LAMP_TOE, 0, -60);

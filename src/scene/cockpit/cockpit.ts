@@ -39,6 +39,8 @@ const PILLAR_ENDS: [THREE.Vector3, THREE.Vector3, number][] = [
 ];
 /** How far the fan knob turns either way, and half the temperature slot's length, local to the climate panel. */
 const FAN_STOP = 2.4, TEMP_SLOT = 0.0283;
+/** How much thicker the side windows' fog shows than the windshield's thin film, so its patches read. */
+const SIDE_FOG_GAIN = 3;
 /** How fast drops on the side windows drift back, in texture widths per metre driven. */
 const SIDE_RAIN_DRIFT = 0.004;
 /** How far back the steamed-up side windows reach: past the eye sat all the way back. */
@@ -349,20 +351,26 @@ export class Cockpit {
   /** Steams the side windows up with the windshield while the driver settles in, so they don't give the drive away either. */
   setSideMist({ level, dark, fog }: { level: number; dark: number; fog: number }): void {
     // Steamed up while settling in; fogged in patches, like the windshield, when the A/C is off in the wet.
-    const shown = Math.max(level, Math.min(1, fog * 1.6));
+    const fogged = Math.min(1, fog * SIDE_FOG_GAIN), shown = Math.max(level, fogged);
     for (const pane of this.sidePanes) pane.visible = shown > 0.01;
     this.sideMist.opacity = shown;
-    this.sideMist.map = level > fog ? null : this.sideFog;
-    this.sideMist.needsUpdate = true;
+    const map = level >= fogged ? null : this.sideFog;
+    if (map !== this.sideMist.map) {
+      this.sideMist.map = map;
+      this.sideMist.needsUpdate = true;
+    }
+    // Steam is a dim film; fog patches are lighter, catching what light there is.
+    if (map) this.sideMist.color.setScalar(lerp(0.9, 0.5, dark));
+    else this.sideMist.color.setRGB(lerp(0.52, 0.14, dark), lerp(0.55, 0.15, dark), lerp(0.6, 0.18, dark), THREE.SRGBColorSpace);
     this.mirror.setFog(fog);
-    this.sideMist.color.setRGB(lerp(0.52, 0.14, dark), lerp(0.55, 0.15, dark), lerp(0.6, 0.18, dark), THREE.SRGBColorSpace);
   }
 
   /** Rain on the side windows, as heavy as it falls, drifting back faster the quicker the car goes. */
   setSideRain(level: number, speed: number, dt: number): void {
     for (const pane of this.rainPanes) pane.visible = level > 0.01;
     this.sideRain.opacity = Math.min(1, level * 1.4);
-    this.sideRainTexture.offset.x = (this.sideRainTexture.offset.x + speed * dt * SIDE_RAIN_DRIFT) % 1;
+    // The texture runs from the pillar back past the eye, so drifting back means sliding it towards the front's side of the texture.
+    this.sideRainTexture.offset.x = (this.sideRainTexture.offset.x - speed * dt * SIDE_RAIN_DRIFT + 1) % 1;
   }
 
   /** Turns the fan knob by a drag, within its stops. */
