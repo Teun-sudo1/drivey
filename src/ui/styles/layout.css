@@ -118,9 +118,6 @@ body.reduced #start.cranking #ignition svg { animation: none; }
 .intro-news { position: absolute; top: calc(20px + var(--st)); left: 50%; transform: translateX(-50%); width: min(560px, 88vw); text-align: center; font-size: 13px; line-height: 1.45; color: rgba(255, 230, 205, .85); opacity: 0; animation: intro-word .6s ease-out .4s forwards; }
 @keyframes intro-in { to { opacity: 0; } }
 @keyframes intro-word { to { opacity: 1; } }
-body.reduced #intro, body.reduced #intro::before, body.reduced #intro * { animation: none; opacity: 1; transition: none; }
-body.reduced #intro::before { opacity: 0; }
-body.reduced #intro.gone { opacity: 0; }
 
 /* The optional frame-rate counter, small and out of the way. */
 #fps { position: fixed; z-index: 9; left: calc(10px + var(--sl, 0px)); bottom: calc(10px + var(--sb, 0px)); padding: 3px 8px; border-radius: 6px; background: rgba(0, 0, 0, .55); color: #ffbe78; font: 12px var(--mono); pointer-events: none; }
