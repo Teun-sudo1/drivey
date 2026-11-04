@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:full": "E2E_FULL=1 playwright test",
     "build:e2e": "vite build --mode e2e --outDir dist-e2e"
   },
   "dependencies": {

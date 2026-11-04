@@ -87,6 +87,8 @@ export class Ambience {
     // Rain on glass: a soft hiss over a rumble. Its top end stops at 3.2 kHz, which keeps it from sounding harsh.
     loop(ctx, noise.white, [filter(ctx, 'highpass', 500), filter(ctx, 'lowpass', 3200)], ch.rain, 0.28);
     loop(ctx, noise.brown, [filter(ctx, 'lowpass', 1100)], ch.rain, 0.45);
+    // Rain drumming on the roof: a hollow, low patter above the glass, which the heavier rain brings up with the rest.
+    loop(ctx, noise.white, [filter(ctx, 'bandpass', 380, 1.4), filter(ctx, 'lowpass', 900)], ch.rain, 0.5);
 
     // Engine: detuned saws and a sub, under road rumble.
     this.hum = ctx.createGain();

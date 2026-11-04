@@ -74,7 +74,7 @@ export interface Outline {
 
 /** Low-poly interior, parented to the camera so it never leaves the frame. */
 export class Cockpit {
-  readonly dashLight = new THREE.PointLight(0xff9a50, 0.1, 0.8, 2);
+  readonly dashLight = new THREE.PointLight(0xff9a50, 0.1, 1.5, 2);
   // Short range: it lights the interior but must not reach the road, 1.77 below it.
   readonly passLight = new THREE.PointLight(0xffffff, 0, 1.7, 1.5);
   /** The lit indicator in each door mirror's outer end: towards lower lane numbers, then higher. */
@@ -275,7 +275,8 @@ export class Cockpit {
     // The climate panel's printing lights with the ignition, like the radio.
     this.screens.push(this.radio.face, climatePanel);
 
-    this.dashLight.position.set(DRIVER_X, -0.36, -0.82);
+    // Between the gauges and the radio, just off the dash, so their glow reaches the wheel, console and door.
+    this.dashLight.position.set(DRIVER_X - 0.35, -0.38, -0.72);
     this.passLight.position.set(-0.2, 0.55, -0.5);
     this.cabinLight.position.set(-0.35, 0.44, -0.35);
     root.add(this.dashLight, this.passLight, this.cabinLight);

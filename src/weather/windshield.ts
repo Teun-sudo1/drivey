@@ -75,6 +75,8 @@ const DEMIST_RATE = 1.6;
 export const GLASS_W = 1200, GLASS_H = 540;
 /** The glass panel's bottom edge, left to right in the cockpit's space, which the texture spans. */
 export const GLASS_X0 = -1.42, GLASS_X1 = 0.9;
+/** How many beads of condensation the steamed-up glass shows. */
+const CONDENSATION_BEADS = 6000;
 const RUNNING_DROP_RADIUS = 3.4;
 const MAX_TRAIL = 110;
 /** How far behind the blade its wet smear reaches, in radians. */
@@ -116,6 +118,18 @@ function flakeSprite(): HTMLCanvasElement {
   return canvas;
 }
 
+/** Tiny beads of condensation across the whole glass, drawn once. */
+function condensation(): HTMLCanvasElement {
+  const { canvas, ctx: g } = createCanvas(GLASS_W, GLASS_H);
+  for (let i = 0; i < CONDENSATION_BEADS; i++) {
+    g.fillStyle = `rgba(225,232,242,${rand(0.05, 0.2)})`;
+    g.beginPath();
+    g.arc(rand(0, GLASS_W), rand(0, GLASS_H), rand(0.5, 1.8), 0, Math.PI * 2);
+    g.fill();
+  }
+  return canvas;
+}
+
 class CanvasWindshield implements Windshield {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly sprites = {
@@ -125,6 +139,9 @@ class CanvasWindshield implements Windshield {
     red: dropSprite('255,90,70')
   };
   private readonly flake = flakeSprite();
+  private readonly beads = condensation();
+  /** How dark it is outside, from the streetlight level, so the steamed-up glass isn't bright at night. */
+  private dark = 0;
   readonly texture: THREE.CanvasTexture;
   private readonly width = GLASS_W;
   private readonly height = GLASS_H;
@@ -170,6 +187,7 @@ class CanvasWindshield implements Windshield {
   }
 
   update({ dt, speed, weather, lamp, wipersOn, shelter }: WindshieldFrame): void {
+    this.dark = lamp;
     this.spawn(dt * (1 - shelter), weather, lamp);
     this.age(dt, speed, weather);
     this.moveWipers(dt, weather, wipersOn);
@@ -326,12 +344,18 @@ class CanvasWindshield implements Windshield {
   }
 
   /** Condensation: thickest up top, thinning towards the vents at the bottom of the glass. */
+  /** Condensation: a milky film, lit like the night or day outside, thicker towards the bottom, beaded with tiny droplets. */
   private drawMist(): void {
     const g = this.ctx, fade = g.createLinearGradient(0, this.top, 0, this.bottom);
-    fade.addColorStop(0, `rgba(122,130,142,${this.mist})`);
-    fade.addColorStop(1, `rgba(96,104,116,${this.mist})`);
+    const shade = (day: number, night: number): number => Math.round(lerp(day, night, this.dark));
+    const tone = (day: number[], night: number[], alpha: number) => `rgba(${day.map((d, i) => shade(d, night[i])).join()},${alpha * this.mist})`;
+    fade.addColorStop(0, tone([150, 158, 170], [38, 42, 52], 0.86));
+    fade.addColorStop(1, tone([120, 128, 140], [30, 33, 41], 0.97));
     g.fillStyle = fade;
     g.fillRect(0, this.top, this.width, this.bottom - this.top);
+    g.globalAlpha = this.mist * lerp(0.9, 0.5, this.dark);
+    g.drawImage(this.beads, 0, 0);
+    g.globalAlpha = 1;
   }
 
   /** The film of water a blade leaves behind as it sweeps. */

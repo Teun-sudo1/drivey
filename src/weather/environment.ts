@@ -9,6 +9,8 @@ import type { Stage } from '../scene/stage';
 import type { Particles } from './particles';
 import { LATER, TIMES_OF_DAY, WEATHERS, type TimeOfDayId, type WeatherId } from './tables';
 
+/** How bright the instruments' glow over the cabin gets at night. */
+const DASH_GLOW = 0.8;
 const BLEND_RATE = 1.1;
 const COLOR_KEYS = ['top', 'bot', 'fogC', 'sunCol'] as const;
 const NUMBER_KEYS = ['fogD', 'hemi', 'sun', 'win', 'lamp', 'head', 'wet', 'rain', 'snow', 'exp', 'bloom', 'star', 'over', 'power'] as const;
@@ -153,7 +155,8 @@ export class Environment {
     lights.sun.color.copy(env.sunCol);
     // Two lamps whose beams overlap down the road, each a little over half of what one beam was.
     for (const lamp of lights.headlights) lamp.intensity = 0.6 * (170 * env.head + 30 * env.over * (1 - env.head)) * env.power;
-    cockpit.dashLight.intensity = (0.03 + 0.1 * env.lamp) * env.power;
+    // At night the gauges and radio cast a warm glow over the wheel and dash, so the cabin isn't lost in the dark.
+    cockpit.dashLight.intensity = (0.03 + DASH_GLOW * env.lamp) * env.power;
     cockpit.mirror.setEnvironment(env);
     const daylight = 1 - Math.min(1, env.win);
     WINDOW_MATERIALS.forEach((m, i) => {
