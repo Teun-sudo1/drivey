@@ -78,7 +78,8 @@ engine.onChange(state => {
   if (state === 'running') showTipsOnce(settings);
 });
 const environment = new Environment(stage, lights, postfx, cockpit, backdrop, particles);
-const windshield = createWindshield($<HTMLCanvasElement>('#glass'), stage.camera, cockpit.roof, cockpit.glassOccluders, cockpit.sideWindows, cockpit.pillars, route.lampTint);
+const windshield = createWindshield($<HTMLCanvasElement>('#glass'), route.lampTint);
+cockpit.addGlass(windshield.texture);
 settings.onChange(() => stage.setPov(settings.value.pov));
 stage.setPov(settings.value.pov, true);
 // Each visit starts by settling into the seat behind steamed-up glass, so the scenery is a surprise.
@@ -92,13 +93,19 @@ const startScreen = createStartScreen(engine, instantly => {
   cockpit.setNavLoading(false);
 });
 
+/** How often the frame-rate counter updates, in seconds. */
+const FPS_EVERY_S = 0.5;
+/** How near the volume knob, in pixels, a press takes hold of it. */
+const KNOB_GRAB_PX = 22;
+/** How far the fan knob turns, in radians, and the temperature lever slides, in metres, per pixel dragged. */
+const FIDDLE_TURN_PER_PX = 0.03, FIDDLE_SLIDE_PER_PX = 0.0004;
 /** How far the volume knob is dragged, in pixels, for a quarter of the volume. */
 const KNOB_DRAG_PX = 30;
 /** How far the head turns per pixel dragged, in radians. */
 const LOOK_PER_PX = 0.004;
 // Tapping the A/C button on the dash: it lights up and keeps the glass clear of fog.
 {
-  const ray = new THREE.Raycaster(), at = new THREE.Vector2(), gl = $<HTMLCanvasElement>('#gl');
+  const ray = new THREE.Raycaster(), at = new THREE.Vector2(), knobAt = new THREE.Vector3(), gl = $<HTMLCanvasElement>('#gl');
   // The interior is drawn on its own layer.
   ray.layers.enableAll();
   const setAirCon = (on: boolean): void => {
@@ -107,8 +114,15 @@ const LOOK_PER_PX = 0.004;
   };
   // The radio's volume knob turns as it's dragged up or down.
   let turning: { y: number; volume: number } | null = null;
+  // The fan knob turns and the temperature lever slides, just for the feel of it.
+  let fiddling: { control: 'fan' | 'temp'; x: number; y: number } | null = null;
   // Dragging anywhere else turns the head to look around the car; the button beside fullscreen faces forward again.
   let looking: { x: number; y: number } | null = null;
+  /** How far a press is from a dashboard control on screen, in pixels. */
+  const pxFrom = (object: THREE.Object3D, e: PointerEvent): number => {
+    const p = object.getWorldPosition(knobAt).project(stage.camera);
+    return Math.hypot(((p.x + 1) / 2) * innerWidth - e.clientX, ((1 - p.y) / 2) * innerHeight - e.clientY);
+  };
   const btnLook = $('#btnLook');
   gl.addEventListener('pointermove', e => {
     if (looking) {
@@ -116,11 +130,16 @@ const LOOK_PER_PX = 0.004;
       looking = { x: e.clientX, y: e.clientY };
       btnLook.hidden = false;
     }
+    if (fiddling) {
+      if (fiddling.control === 'fan') cockpit.turnFan((fiddling.y - e.clientY) * FIDDLE_TURN_PER_PX);
+      else cockpit.slideTemp((e.clientX - fiddling.x) * FIDDLE_SLIDE_PER_PX);
+      fiddling = { ...fiddling, x: e.clientX, y: e.clientY };
+    }
     if (!turning) return;
     const dy = (turning.y - e.clientY) / KNOB_DRAG_PX;
     settings.update({ mix: { ...settings.value.mix, music: Math.min(1, Math.max(0, turning.volume + dy * 0.25)) } });
   });
-  addEventListener('pointerup', () => (turning = looking = null));
+  addEventListener('pointerup', () => (turning = looking = fiddling = null));
   btnLook.addEventListener('click', () => {
     stage.lookBy(-stage.look.yaw, -stage.look.pitch);
     btnLook.hidden = true;
@@ -128,8 +147,15 @@ const LOOK_PER_PX = 0.004;
   gl.addEventListener('pointerdown', e => {
     at.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
     ray.setFromCamera(at, stage.camera);
-    if (ray.intersectObject(cockpit.radio.volumeKnob).length) {
+    // The knobs are small, so a press anywhere a fingertip away from one takes hold of it.
+    if (pxFrom(cockpit.radio.volumeKnob, e) < KNOB_GRAB_PX) {
       turning = { y: e.clientY, volume: settings.value.mix.music };
+      gl.setPointerCapture(e.pointerId);
+      return;
+    }
+    for (const [control, object] of [['fan', cockpit.fanKnob], ['temp', cockpit.tempLever]] as const) {
+      if (pxFrom(object, e) >= KNOB_GRAB_PX) continue;
+      fiddling = { control, x: e.clientX, y: e.clientY };
       gl.setPointerCapture(e.pointerId);
       return;
     }
@@ -341,8 +367,21 @@ function watchFrames(dt: number): void {
   toast(`Graphics set to ${quality.name} to keep the drive smooth`);
 }
 
+const fpsCounter = $('#fps');
+let fpsFrames = 0, fpsTime = 0;
+/** Counts frames, showing the rate twice a second while the counter is on. */
+function countFrames(dt: number): void {
+  if (fpsCounter.hidden) return;
+  fpsFrames++;
+  fpsTime += dt;
+  if (fpsTime < FPS_EVERY_S) return;
+  fpsCounter.textContent = `${Math.round(fpsFrames / fpsTime)} fps`;
+  fpsFrames = fpsTime = 0;
+}
+
 function applyBodyFlags(): void {
-  const { grain, vignette, reduced } = settings.value;
+  const { grain, vignette, reduced, fps } = settings.value;
+  fpsCounter.hidden = !fps;
   document.body.classList.toggle('nograin', !grain);
   document.body.classList.toggle('novignette', !vignette);
   document.body.classList.toggle('reduced', reduced);
@@ -409,7 +448,7 @@ function simulate(dt: number): void {
   const open = 1 - shelterAt(shelters, 0);
   shelter = 1 - open;
   particles.update({ dt, speed: drive.speed, clock: drive.clock, rain: environment.rainLevel * open, snow: environment.snowLevel * open, reducedMotion: s.reduced });
-  windshield.update({ dt, speed: drive.speed, weather: WEATHERS[s.weather], lamp: environment.lampLevel, wipersOn: ignitionOn, mirrored: s.driveSide === 'right', shelter: 1 - open });
+  windshield.update({ dt, speed: drive.speed, weather: WEATHERS[s.weather], lamp: environment.lampLevel, wipersOn: ignitionOn, shelter: 1 - open });
   roadSurface.setLevels(environment.wetLevel, environment.snowLevel, environment.headlightLevel);
   roadSurface.setShelters(shelters);
 }
@@ -423,6 +462,7 @@ startLoop(dt => {
     effects.tick(indicatorLit);
   }
   watchFrames(dt);
+  countFrames(dt);
   const s = settings.value;
   // Once a frame rather than per simulated step, as each call schedules audio changes.
   ambience.update({ dt, weather: WEATHERS[s.weather], route: s.route, speed: drive.speed, engine: engine.state, mix: s.mix, follow: s.follow, shelter });

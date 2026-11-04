@@ -139,7 +139,7 @@ test('sat back, the gear lever shows on the console', async ({ page }) => {
 
 test.describe('driving side', () => {
   const state = (page: any) => page.evaluate(() => {
-    const { pool, cockpit, roadSurface, windshield, stage } = window.__drivey;
+    const { pool, cockpit, roadSurface, stage } = window.__drivey;
     stage.scene.updateMatrixWorld(true);
     return {
       chunkScale: pool.chunks[0].group.scale.x,
@@ -147,8 +147,7 @@ test.describe('driving side', () => {
       hasLabels: pool.chunks.some((c: any) => c.labels.length > 0),
       interiorScale: cockpit.root.scale.x,
       screensReadable: cockpit.screens.every((s: any) => s.matrixWorld.determinant() > 0),
-      lane: roadSurface.lanes.value.x,
-      mirrored: windshield.mirrored
+      lane: roadSurface.lanes.value.x
     };
   });
 
@@ -156,7 +155,7 @@ test.describe('driving side', () => {
     await page.goto('./');
     await page.waitForFunction(() => window.__drivey?.drive.clock > 0.1);
     await expect(page.locator('#segSide button:has-text("Left")')).toHaveAttribute('aria-pressed', 'true');
-    expect(await state(page)).toMatchObject({ chunkScale: 1, interiorScale: 1, lane: -0.4, mirrored: false, labelsReadable: true, screensReadable: true });
+    expect(await state(page)).toMatchObject({ chunkScale: 1, interiorScale: 1, lane: -0.4, labelsReadable: true, screensReadable: true });
   });
 
   test('choosing right mirrors the road and car, keeps text readable, and persists', async ({ page }) => {
@@ -167,7 +166,6 @@ test.describe('driving side', () => {
     await expect(page.locator('#segSide button:has-text("Right")')).toHaveAttribute('aria-pressed', 'true');
     await page.click('#btnClose');
 
-    await expect.poll(async () => (await state(page)).mirrored).toBe(true);
     const right = await state(page);
     expect(right).toMatchObject({ chunkScale: -1, interiorScale: -1, lane: 0.4, labelsReadable: true, hasLabels: true, screensReadable: true });
 

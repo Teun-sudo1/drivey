@@ -8,6 +8,7 @@ import { createClimate } from './climate';
 import { createLcd } from './lcd';
 import { Mirror } from './mirror';
 import { createNav } from './nav';
+import { GLASS_X0, GLASS_X1 } from '../../weather/windshield';
 import { CarRadio, type RadioState } from './radio';
 
 const GAUGE_INTERVAL = 0.1;
@@ -35,12 +36,10 @@ const PILLAR_ENDS: [THREE.Vector3, THREE.Vector3, number][] = [
   [new THREE.Vector3(-1.5, -0.47, -1.45), new THREE.Vector3(-1.15, 0.5, -0.5), -1],
   [new THREE.Vector3(0.98, -0.47, -1.45), new THREE.Vector3(0.77, 0.5, -0.5), 1]
 ];
-/** The door sill, where the side windows start. */
-const SILL_Y = -0.47;
+/** How far the fan knob turns either way, and half the temperature slot's length, local to the climate panel. */
+const FAN_STOP = 2.4, TEMP_SLOT = 0.0283;
 /** Where the roof's front edge runs, above the windshield, and how far up each pillar starts sweeping into it. */
 const ROOF_EDGE = { y: 0.487, z: -1.09 }, PILLAR_SWEEP_FROM = 0.45;
-/** Where the side windows stop being drawn: just ahead of the eye, since points behind it would project flipped. */
-const SIDE_WINDOW_END = -0.05;
 /** Where the lever leaves the console, how far it leans back, and its reach up into the gap between radio and wheel. */
 const GEAR_LEVER = { x: -0.4, y: -0.78, z: -0.4, lean: 0.2, length: 0.26, knob: 0.034 };
 
@@ -67,8 +66,8 @@ function bonnetGeometry(): THREE.BufferGeometry {
   return geometry;
 }
 
-/** Part of the interior that sits in front of the windshield, as a polygon local to `object`. */
-export interface GlassOccluder {
+/** The outline of a part of the interior, as a polygon local to `object`, for finding it on screen. */
+export interface Outline {
   object: THREE.Object3D;
   points: THREE.Vector3[];
 }
@@ -83,6 +82,9 @@ export class Cockpit {
   private signal = 0;
   /** The A/C button on the climate stack, which the page listens for taps on. */
   acButton!: THREE.Mesh;
+  /** The fan knob and temperature lever: they turn and slide when played with, though only for show. */
+  fanKnob!: THREE.Group;
+  tempLever!: THREE.Mesh;
   private readonly headTurn = new THREE.Euler();
   private readonly climate = createClimate();
   /** The headlamp lenses at the front of the wings, lit with the headlights. */
@@ -104,11 +106,8 @@ export class Cockpit {
   readonly radio: CarRadio;
   /** What the radio shows; the dial eases to the station on its own. */
   readonly radioState: RadioState = { dial: 0, station: 0, volume: 0, on: true };
-  readonly glassOccluders: GlassOccluder[];
   /** The A-pillars' outlines, which mark where the glass ends at the sides. */
-  readonly pillars: GlassOccluder[];
-  /** The side windows beyond the pillars, down to the door sills. */
-  readonly sideWindows: GlassOccluder[];
+  readonly pillars: Outline[];
 
   private readonly root = new THREE.Group();
   private readonly screens: THREE.Mesh[];
@@ -183,15 +182,17 @@ export class Cockpit {
     // The real parts: knurled fan and airflow knobs, a lever in the temperature slot, and the A/C push button.
     const knobMetal = new THREE.MeshStandardMaterial({ color: 0x2a2624, roughness: 0.7, metalness: 0.3, emissive: 0x0e0c0b });
     const amberLine = new THREE.MeshBasicMaterial({ color: 0xffbe78, toneMapped: false });
-    for (const [y, turn] of [[0.11 - (32 / 264) * 0.22, 0.6], [0.11 - (170 / 264) * 0.22, -0.8]] as const) {
+    const knobs = [[0.11 - (32 / 264) * 0.22, 0.6], [0.11 - (170 / 264) * 0.22, -0.8]] as const;
+    for (const [i, [y, turn]] of knobs.entries()) {
       const knob = new THREE.Group();
+      if (i === 0) this.fanKnob = knob;
       knob.position.set(0, y, 0);
       knob.rotation.z = -turn;
       climatePanel.add(knob);
       mesh(new THREE.CylinderGeometry(0.014, 0.015, 0.014, 24), knobMetal, 0, 0, 0.007, 1, 1, 1, knob).rotation.x = Math.PI / 2;
       mesh(BOX, amberLine, 0, 0.007, 0.0145, 0.0015, 0.01, 0.001, knob);
     }
-    mesh(BOX, knobMetal, 0.62 * 0.0567 - 0.0283, 0.11 - (107 / 264) * 0.22, 0.005, 0.006, 0.016, 0.01, climatePanel);
+    this.tempLever = mesh(BOX, knobMetal, TEMP_SLOT * (0.62 * 2 - 1), 0.11 - (107 / 264) * 0.22, 0.005, 0.006, 0.016, 0.01, climatePanel);
     // The A/C button, a grey cap like the radio's; taps on it land here.
     const acBody = new THREE.MeshStandardMaterial({ color: 0x24201e, roughness: 0.85 });
     const acFace = new THREE.MeshStandardMaterial({ color: 0x1a1817, roughness: 0.85, emissiveMap: this.climate.buttonTexture, emissive: 0xffffff });
@@ -257,7 +258,8 @@ export class Cockpit {
     flatten(cabin);
     mergeStatic(cabin);
     // The climate panel's knobs and lever, all but the A/C button, which lights and is tapped.
-    const keep = new Set<THREE.Object3D>([this.acButton]);
+    // The fan knob and temperature lever move when played with, so they stay apart too.
+    const keep = new Set<THREE.Object3D>([this.acButton, this.fanKnob, this.tempLever]);
     const climateParts = new THREE.Group();
     climatePanel.add(climateParts);
     for (const part of [...climatePanel.children]) if (part !== climateParts && !keep.has(part)) climateParts.add(part);
@@ -279,31 +281,35 @@ export class Cockpit {
     root.add(this.dashLight, this.passLight, this.cabinLight);
 
     this.pillars = this.addPillars(root, intA);
-    this.sideWindows = PILLAR_ENDS.map(([a, b, outward]) => {
-      const outer = outward * PILLAR_WIDTH / 2;
-      return {
-        object: root,
-        points: [
-          new THREE.Vector3(a.x + outer, SILL_Y, a.z),
-          new THREE.Vector3(b.x + outer, b.y + 0.1, b.z),
-          // Back beside the eye, which sees that far when sitting back.
-          new THREE.Vector3(b.x + outward * 3, b.y + 0.1, SIDE_WINDOW_END),
-          new THREE.Vector3(a.x + outward * 3, SILL_Y, SIDE_WINDOW_END)
-        ]
-      };
-    });
     hideFromReflection(root);
+  }
 
-    const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
-    this.glassOccluders = [
-      ...this.mirror.occluders,
-      ...this.pillars,
-      { object: this.radio.group, points: this.radio.outline },
-      // The wheel's rim rises above the dash, most of all when sitting back.
-      { object: this.wheel, points: Array.from({ length: 16 }, (_, i) => V(Math.cos((i / 16) * Math.PI * 2) * 0.225, Math.sin((i / 16) * Math.PI * 2) * 0.225, 0)) },
-      { object: navUnit, points: [V(-0.15, -0.095, 0), V(0.15, -0.095, 0), V(0.15, 0.095, 0), V(-0.15, 0.095, 0)] },
-      { object: root, points: [V(DRIVER_X - 0.31, -0.46, -0.92), V(DRIVER_X - 0.22, -0.32, -0.92), V(DRIVER_X, -0.28, -0.92), V(DRIVER_X + 0.22, -0.32, -0.92), V(DRIVER_X + 0.31, -0.46, -0.92)] }
+  /** The windshield panel, between the pillars from the dash to the roof, showing what's on the glass. */
+  addGlass(texture: THREE.Texture): void {
+    const [left, right] = PILLAR_ENDS, inset = PILLAR_WIDTH / 2;
+    const corners = [
+      [GLASS_X0, left[0].y, left[0].z], [GLASS_X1, right[0].y, right[0].z],
+      [right[1].x - inset, ROOF_EDGE.y, ROOF_EDGE.z], [left[1].x + inset, ROOF_EDGE.y, ROOF_EDGE.z]
     ];
+    const glass = new THREE.BufferGeometry();
+    glass.setAttribute('position', new THREE.Float32BufferAttribute(corners.flat(), 3));
+    glass.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+    glass.setIndex([0, 1, 2, 0, 2, 3]);
+    // Drawn after the cabin and without depth of its own, so whatever sits in front of the glass covers it.
+    const panel = new THREE.Mesh(glass, new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+    panel.renderOrder = 1;
+    this.root.add(panel);
+    hideFromReflection(panel);
+  }
+
+  /** Turns the fan knob by a drag, within its stops. */
+  turnFan(by: number): void {
+    this.fanKnob.rotation.z = THREE.MathUtils.clamp(this.fanKnob.rotation.z - by, -FAN_STOP, FAN_STOP);
+  }
+
+  /** Slides the temperature lever along its slot, from blue to red. */
+  slideTemp(by: number): void {
+    this.tempLever.position.x = THREE.MathUtils.clamp(this.tempLever.position.x + by * this.side, -TEMP_SLOT, TEMP_SLOT);
   }
 
   /** 1 is the right-hand-drive interior as built; -1 mirrors it for a left-hand-drive car. */
@@ -533,7 +539,7 @@ export class Cockpit {
   }
 
   /** The A-pillars, returning each one's outline plus everything beyond it, where the glass ends. */
-  private addPillars(root: THREE.Group, material: THREE.Material): GlassOccluder[] {
+  private addPillars(root: THREE.Group, material: THREE.Material): Outline[] {
     // Double-sided for the sweeps' sake; the pillars and sweeps are then all drawn as one.
     const frameMaterial = (material as THREE.MeshStandardMaterial).clone();
     frameMaterial.side = THREE.DoubleSide;

@@ -13,7 +13,7 @@ const STATUS: Record<EngineState, string> = {
 export interface StartScreen {
   /** Settles into the seat and moves on to setting up the drive; instantly skips the glass clearing. */
   settle(instantly?: boolean): void;
-  /** Goes straight to driving, for the browser tests. */
+  /** Goes straight to driving, as the Start driving button does. */
   skip(): void;
 }
 
@@ -32,6 +32,12 @@ export function createStartScreen(engine: CarEngine, settled: (instantly: boolea
     showStep('setup');
   };
   $('#btnSeated').addEventListener('click', () => settle());
+  // Straight onto the road with the saved choices, past the setup card and the key.
+  const startNow = (): void => {
+    settle(true);
+    engine.set('running');
+  };
+  $('#btnQuickStart').addEventListener('click', startNow);
   $('#btnGetIn').addEventListener('click', () => {
     showStep('key');
     key.focus({ preventScroll: true });
@@ -50,9 +56,6 @@ export function createStartScreen(engine: CarEngine, settled: (instantly: boolea
   createIgnition(key, keyBody, keyTag, engine);
   return {
     settle,
-    skip: () => {
-      settle(true);
-      engine.set('running');
-    }
+    skip: startNow
   };
 }

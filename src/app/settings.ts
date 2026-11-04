@@ -25,6 +25,8 @@ export interface Settings {
   bloom: boolean;
   vignette: boolean;
   grain: boolean;
+  /** Shows a frame-rate counter in the corner. */
+  fps: boolean;
   reduced: boolean;
   focus: number;
   short: number;
@@ -53,7 +55,7 @@ export interface Settings {
 
 
 export type DurationKey = 'focus' | 'short' | 'long' | 'every';
-export type ToggleKey = 'bloom' | 'vignette' | 'grain' | 'reduced' | 'auto' | 'breakSlow' | 'follow' | 'muted' | 'followSession';
+export type ToggleKey = 'bloom' | 'vignette' | 'grain' | 'fps' | 'reduced' | 'auto' | 'breakSlow' | 'follow' | 'muted' | 'followSession';
 
 /** min, max, step */
 export const DURATION_LIMITS: Record<DurationKey, readonly [number, number, number]> = {
@@ -74,6 +76,7 @@ function defaults(): Settings {
     bloom: true,
     vignette: true,
     grain: true,
+    fps: false,
     reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
     focus: 25,
     short: 5,
@@ -134,7 +137,7 @@ function sanitize(stored: unknown): Settings {
   const { seat } = stored as { seat?: unknown };
   if (seat === 'close' || seat === 'back') s.pov = seat === 'back' ? 1 : 0;
   if (typeof raw.task === 'string') s.task = raw.task.slice(0, MAX_TASK);
-  for (const k of ['bloom', 'vignette', 'grain', 'reduced', 'auto', 'breakSlow', 'follow', 'muted', 'musicOn', 'tipsSeen', 'followSession'] as const) {
+  for (const k of ['bloom', 'vignette', 'grain', 'fps', 'reduced', 'auto', 'breakSlow', 'follow', 'muted', 'musicOn', 'tipsSeen', 'followSession'] as const) {
     const v = raw[k];
     if (typeof v === 'boolean') s[k] = v;
   }

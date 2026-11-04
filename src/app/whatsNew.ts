@@ -1,6 +1,10 @@
 /** What changed in each release, newest first: the latest shows under the setup card, and all are listed under Stats. */
 export const RELEASES = [
   {
+    id: '2026-11-05',
+    notes: 'Rain and mist now sit on the windshield itself, clear side windows, realistic wipers, a turnable volume knob, a Start driving button, and an optional frame rate counter.'
+  },
+  {
     id: '2026-11-04',
     notes: 'A new 80s interior with real knobs and buttons, A/C that keeps the glass clear in rain, drag to look around the car, and a new app icon.'
   },

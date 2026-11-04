@@ -75,34 +75,45 @@ test.describe('dashboard radio', () => {
     expect(await page.evaluate(() => window.__drivey.settings.value.musicOn)).toBe(true);
   });
 
-  test('dragging the volume sets how loud the music plays, which the Sound tab shows and which is remembered', async ({ page }) => {
+  test('turning the volume knob sets how loud the music plays, which the Sound tab shows and which is remembered', async ({ page }) => {
     await openApp(page);
     const f = await radio(page);
     expect(f.box.left).toBeGreaterThanOrEqual(0);
     expect(f.box.right).toBeLessThanOrEqual(page.viewportSize()!.width);
-    const knob = at(f, await music(page));
+    const knob = await page.evaluate(() => {
+      const { cockpit, stage } = window.__drivey;
+      stage.camera.updateMatrixWorld(true);
+      const v = cockpit.radio.volumeKnob.getWorldPosition(stage.camera.position.clone()).project(stage.camera);
+      return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
+    });
+    // Down turns it down: 30 pixels for a quarter of the way.
     await page.mouse.move(knob.x, knob.y);
     await page.mouse.down();
-    const low = at(f, 0.1);
-    await page.mouse.move(low.x, low.y, { steps: 6 });
+    await page.mouse.move(knob.x, knob.y + 400, { steps: 6 });
     await page.mouse.up();
-    expect(await music(page)).toBeCloseTo(0.1, 1);
-    await expect.poll(() => page.evaluate(() => window.__drivey.cockpit.radioState.volume)).toBeCloseTo(0.1, 1);
-
-    // Past the end of the slot pins it to the top.
-    const top = at(f, 0.95);
-    await page.mouse.move(top.x, top.y);
+    expect(await music(page)).toBe(0);
+    await page.mouse.move(knob.x, knob.y);
     await page.mouse.down();
-    await page.mouse.move(top.x + 200, top.y, { steps: 4 });
+    await page.mouse.move(knob.x, knob.y - 30, { steps: 3 });
     await page.mouse.up();
-    expect(await music(page)).toBe(1);
+    expect(await music(page)).toBeCloseTo(0.25, 2);
+    await expect.poll(() => page.evaluate(() => window.__drivey.cockpit.radioState.volume)).toBeCloseTo(0.25, 2);
+
+    // The scale on the display only shows the level; dragging along it changes nothing.
+    const from = at(f, 0.2), to = at(f, 0.9);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 4 });
+    await page.mouse.up();
+    await page.evaluate(() => window.__drivey.stage.lookBy(-window.__drivey.stage.look.yaw, -window.__drivey.stage.look.pitch));
+    expect(await music(page)).toBeCloseTo(0.25, 2);
+
     await page.click('#btnPanel');
     await page.click('[data-tab="sound"]');
-    await expect(page.getByLabel('Music volume', { exact: true }).first()).toHaveValue('1');
-
+    await expect(page.getByLabel('Music volume', { exact: true }).first()).toHaveValue('0.25');
     await page.reload();
     await page.waitForFunction(() => window.__drivey);
-    expect(await music(page)).toBe(1);
+    expect(await music(page)).toBeCloseTo(0.25, 2);
   });
 
   test('a press away from the radio changes nothing', async ({ page }) => {
@@ -133,32 +144,6 @@ test.describe('dashboard radio', () => {
     expect(await backlight()).toBeGreaterThan(0.95);
   });
 
-  test('rain on the glass never covers it', async ({ page }) => {
-    await openApp(page, { weather: 'heavy' });
-    await advance(page, 4);
-    await page.waitForFunction(() => window.__drivey.stage.settled);
-    // Measured, drawn and read in one go, so no frame can move anything in between.
-    const { inside, total } = await page.evaluate(() => {
-      const { cockpit, stage, windshield } = window.__drivey;
-      stage.camera.updateMatrixWorld(true);
-      windshield.draw();
-      const canvas = document.querySelector<HTMLCanvasElement>('#glass')!, scale = canvas.width / canvas.clientWidth;
-      const corners = cockpit.radio.outline.map((p: any) => {
-        const v = cockpit.radio.group.localToWorld(p.clone()).project(stage.camera);
-        return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
-      });
-      // Seen at an angle the housing is a slanted quad, so take the largest box inside it, not around it,
-      // inset past the clip's soft, anti-aliased edge.
-      const [bl, br, tr, tl] = corners;
-      const left = Math.max(bl.x, tl.x) + 4, right = Math.min(br.x, tr.x) - 4, top = Math.max(tl.y, tr.y) + 4, bottom = Math.min(bl.y, br.y) - 4;
-      const x = left * scale, y = top * scale, w = (right - left) * scale, h = (bottom - top) * scale;
-      const ctx = canvas.getContext('2d')!;
-      const count = (d: Uint8ClampedArray) => d.reduce((n, v, i) => n + (i % 4 === 3 && v ? 1 : 0), 0);
-      return { inside: count(ctx.getImageData(x, y, w, h).data), total: count(ctx.getImageData(0, 0, canvas.width, canvas.height).data) };
-    });
-    expect(total).toBeGreaterThan(50);
-    expect(inside).toBe(0);
-  });
 
   test('its scale stays readable when driving on the right', async ({ page }) => {
     await openApp(page, { driveSide: 'right' });

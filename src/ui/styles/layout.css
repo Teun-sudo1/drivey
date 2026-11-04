@@ -1,5 +1,6 @@
-#gl, #glass { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-#glass { pointer-events: none; }
+#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+/* Only the source of the windshield panel's texture; the panel shows it in the car. */
+#glass { display: none; }
 /* Dragging the scene looks around rather than scrolling the page. */
 #gl { touch-action: none; }
 /* Reachable by keyboard and screen readers; the visible control is the fader on the dashboard. */
@@ -117,3 +118,6 @@ body.reduced #start.cranking #ignition svg { animation: none; }
 @keyframes intro-out { to { opacity: 0; visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) { #intro { display: none; } }
 body.reduced #intro { display: none; }
+
+/* The optional frame-rate counter, small and out of the way. */
+#fps { position: fixed; z-index: 9; left: calc(10px + var(--sl, 0px)); bottom: calc(10px + var(--sb, 0px)); padding: 3px 8px; border-radius: 6px; background: rgba(0, 0, 0, .55); color: #ffbe78; font: 12px var(--mono); pointer-events: none; }

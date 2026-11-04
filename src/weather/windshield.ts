@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { createCanvas } from '../lib/canvas';
-import { clamp, damp, lerp, rand } from '../lib/math';
+import { damp, lerp, rand } from '../lib/math';
 import type { LampTint } from '../routes/types';
-import type { GlassOccluder } from '../scene/cockpit/cockpit';
 import type { Weather } from './tables';
 
 export interface WindshieldFrame {
@@ -13,14 +12,14 @@ export interface WindshieldFrame {
   lamp: number;
   /** Wipers only run with the ignition on. */
   wipersOn: boolean;
-  /** Mirrors the wipers for a left-hand-drive car. */
-  mirrored: boolean;
   /** 0 in the open to 1 in a tunnel, where nothing new lands on the glass. */
   shelter: number;
 }
 
-/** The glass layer. Canvas today; a shader version would only need to implement this. */
+/** The glass layer, painted on a canvas that textures the windshield panel in the car. */
 export interface Windshield {
+  /** The glass, as drawn, for the windshield panel to show. */
+  readonly texture: THREE.Texture;
   update(frame: WindshieldFrame): void;
   /** Called as a blade sets off across the glass, and again as it turns back. */
   onStroke(listener: () => void): void;
@@ -47,11 +46,19 @@ interface Drop {
 }
 
 const MAX_DROPS = 420;
+/** Parked flat along the bottom of the glass, tips towards the passenger, and sweeping up through 45 degrees. */
 const WIPER_PARKED = 3.02;
-const WIPER_FAR = 0.55;
-/** Blade length as a share of the screen's width. */
-const LANDSCAPE_WIPER_REACH = 0.45;
-const PORTRAIT_WIPER_REACH = 0.98;
+const WIPER_FAR = WIPER_PARKED - Math.PI / 4;
+/**
+ * A tandem pair, as on most cars, across the glass for the right-hand-drive car as built (the panel mirrors with the car):
+ * both sweep the same way, the driver's pivoting by the driver's pillar with the longer blade, the passenger's from the middle.
+ */
+const WIPERS = [
+  { x: 0.8, length: 0.85 },
+  { x: -0.12, length: 0.78 }
+];
+/** How far below the glass the pivots sit, in pixels, on the scuttle. */
+const WIPER_PIVOT_DROP = 8;
 /** Stroke widths as a share of the blade's length. */
 const WIPER_ARM_WIDTH = 0.011;
 const WIPER_BLADE_WIDTH = 0.0067;
@@ -64,7 +71,10 @@ const FOGGED_UP = 0.3;
 const FOG_UP_RATE = 0.05;
 /** How quickly the glass clears once a seat is picked. */
 const DEMIST_RATE = 1.6;
-const GLASS_LOWER_EDGE = [-1.4, -0.26, 0.9];
+/** The glass texture's size, in pixels: about as wide for its height as the windshield. */
+export const GLASS_W = 1200, GLASS_H = 540;
+/** The glass panel's bottom edge, left to right in the cockpit's space, which the texture spans. */
+export const GLASS_X0 = -1.42, GLASS_X1 = 0.9;
 const RUNNING_DROP_RADIUS = 3.4;
 const MAX_TRAIL = 110;
 /** How far behind the blade its wet smear reaches, in radians. */
@@ -115,11 +125,11 @@ class CanvasWindshield implements Windshield {
     red: dropSprite('255,90,70')
   };
   private readonly flake = flakeSprite();
-  private readonly point = new THREE.Vector3();
-  private width = 0;
-  private height = 0;
-  private top = 0;
-  private bottom = 0;
+  readonly texture: THREE.CanvasTexture;
+  private readonly width = GLASS_W;
+  private readonly height = GLASS_H;
+  private readonly top = 0;
+  readonly bottom = GLASS_H;
   private drops: Drop[] = [];
   private dropBudget = 0;
   private veil = 0;
@@ -134,23 +144,21 @@ class CanvasWindshield implements Windshield {
   private wiperPeriod = 0;
   private wiperMotion = 0;
   private wetGlass = false;
-  private mirrored = false;
   private readonly strokeListeners: (() => void)[] = [];
-  /** Whether the last frame drew nothing, so an empty glass isn't cleared over and over. */
-  private blank = false;
+  /** Whether the last frame had only the parked wipers on the glass, so a still, dry glass isn't redrawn every frame. */
+  private still = false;
 
   constructor(
-    private readonly canvas: HTMLCanvasElement,
-    private readonly camera: THREE.Camera,
-    private readonly roof: THREE.Object3D,
-    private readonly occluders: readonly GlassOccluder[],
-    private readonly sideWindows: readonly GlassOccluder[],
-    private readonly pillars: readonly GlassOccluder[],
+    canvas: HTMLCanvasElement,
     private lampTint: LampTint
   ) {
+    canvas.width = GLASS_W;
+    canvas.height = GLASS_H;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas is not available');
     this.ctx = ctx;
+    this.texture = new THREE.CanvasTexture(canvas);
+    this.texture.colorSpace = THREE.SRGBColorSpace;
   }
 
   onStroke(listener: () => void): void {
@@ -161,10 +169,7 @@ class CanvasWindshield implements Windshield {
     this.lampTint = tint;
   }
 
-  update({ dt, speed, weather, lamp, wipersOn, mirrored, shelter }: WindshieldFrame): void {
-    this.mirrored = mirrored;
-    this.syncSize();
-    this.measureGlass();
+  update({ dt, speed, weather, lamp, wipersOn, shelter }: WindshieldFrame): void {
     this.spawn(dt * (1 - shelter), weather, lamp);
     this.age(dt, speed, weather);
     this.moveWipers(dt, weather, wipersOn);
@@ -178,36 +183,6 @@ class CanvasWindshield implements Windshield {
   setMisted(misted: boolean, instantly = false): void {
     this.mistTarget = misted ? 1 : 0;
     if (instantly) this.mist = this.mistTarget;
-  }
-
-  private syncSize(): void {
-    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
-    if (w === this.width && h === this.height) return;
-    // Resizing wipes the canvas, so the next frame must paint even if the glass is empty.
-    this.blank = false;
-    const dpr = Math.min(devicePixelRatio, 2);
-    this.width = w;
-    this.height = h;
-    this.canvas.width = w * dpr;
-    this.canvas.height = h * dpr;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  private project(x: number, y: number, z: number, object: THREE.Object3D): { x: number; y: number } {
-    this.point.set(x, y, z);
-    object.localToWorld(this.point).project(this.camera);
-    return { x: (this.point.x * 0.5 + 0.5) * this.width, y: (1 - (this.point.y * 0.5 + 0.5)) * this.height };
-  }
-
-  /** The glass spans from the roof edge to the dashboard, which both move as the camera sways and reframes. */
-  private measureGlass(): void {
-    this.camera.updateMatrixWorld(true);
-    const H = this.height, parent = this.roof.parent as THREE.Object3D;
-    let lowest = H;
-    for (const x of GLASS_LOWER_EDGE) lowest = Math.min(lowest, this.project(x, -0.47, -1.38, parent).y);
-    this.bottom = clamp(lowest, H * 0.4, H);
-    this.top = clamp(this.project(-0.35, this.roof.position.y + 0.485, -1.09, parent).y, 0, H * 0.3);
-    this.drops = this.drops.filter(d => d.y < this.bottom - d.r * 0.5);
   }
 
   private spawn(dt: number, w: Weather, lamp: number): void {
@@ -251,17 +226,10 @@ class CanvasWindshield implements Windshield {
     this.drops = this.drops.filter(d => d.y > this.top - 6 && d.alpha > 0);
   }
 
-  private get wiperPivots(): [number, number][] {
-    // Just below the glass, so parked blades rest on the scuttle in view, above the dash.
-    const y = this.bottom + this.height * 0.008;
-    // Far enough apart that the right one parks clear of the gauge hood, so both show.
-    return [[this.width * 0.36, y], [this.width * 0.86, y]];
-  }
-
-  private get wiperLength(): number {
-    // Tall glass needs blades long relative to its width, or they only clear the bottom of it.
-    const widthShare = this.height > this.width ? PORTRAIT_WIPER_REACH : LANDSCAPE_WIPER_REACH;
-    return Math.min(this.width * widthShare, this.bottom * 1.3);
+  /** Each wiper's pivot on the glass and its blade's length there, in pixels. */
+  private get wiperPivots(): [number, number, number][] {
+    const perMetre = this.width / (GLASS_X1 - GLASS_X0);
+    return WIPERS.map(({ x, length }) => [(x - GLASS_X0) * perMetre, this.height + WIPER_PIVOT_DROP, length * perMetre]);
   }
 
   private moveWipers(dt: number, w: Weather, wipersOn: boolean): void {
@@ -285,7 +253,10 @@ class CanvasWindshield implements Windshield {
         this.wiperWait = w.wipePause;
       }
     }
-    const angle = WIPER_PARKED + (WIPER_FAR - WIPER_PARKED) * (0.5 - 0.5 * Math.cos(Math.PI * 2 * this.wiperPhase));
+    // Up and back as two strokes, each easing out of rest, fastest mid-sweep, and easing into the turn, like a crank-driven linkage.
+    const stroke = this.wiperPhase < 0.5 ? this.wiperPhase * 2 : (1 - this.wiperPhase) * 2;
+    const eased = stroke * stroke * stroke * (stroke * (stroke * 6 - 15) + 10);
+    const angle = WIPER_PARKED + (WIPER_FAR - WIPER_PARKED) * eased;
     this.clearSwept(Math.min(angle, this.wiperAngle), Math.max(angle, this.wiperAngle));
     this.wiperMotion = angle - this.wiperAngle;
     this.wetGlass = w.rain > 0;
@@ -294,10 +265,10 @@ class CanvasWindshield implements Windshield {
 
   private clearSwept(lo: number, hi: number): void {
     if (hi - lo < 1e-4) return;
-    const L = this.wiperLength, pivots = this.wiperPivots;
+    const pivots = this.wiperPivots;
     this.drops = this.drops.filter(d => {
-      for (const [px, py] of pivots) {
-        const dx = (this.mirrored ? this.width - d.x : d.x) - px, dy = py - d.y, dist = Math.hypot(dx, dy);
+      for (const [px, py, L] of pivots) {
+        const dx = d.x - px, dy = py - d.y, dist = Math.hypot(dx, dy);
         if (dist < L && dist > L * 0.1) {
           const phi = Math.atan2(dy, dx);
           if (phi >= lo - 0.02 && phi <= hi + 0.02) return false;
@@ -309,20 +280,12 @@ class CanvasWindshield implements Windshield {
 
   draw(): void {
     const empty = this.drops.length === 0 && this.veil <= 0.001 && this.mist === 0 && this.wiperAngle === WIPER_PARKED && this.wiperPeriod === 0;
-    if (empty && this.blank) return;
-    this.blank = empty;
+    if (empty && this.still) return;
+    this.still = empty;
     const g = this.ctx;
     g.clearRect(0, 0, this.width, this.height);
-    g.save();
-    this.clipToGlass();
     // Outside the glass, so under everything on it: the film, mist and drops all lie between the eye and the blades.
-    g.save();
-    if (this.mirrored) {
-      g.translate(this.width, 0);
-      g.scale(-1, 1);
-    }
     this.drawWipers();
-    g.restore();
     if (this.veil > 0.001) {
       g.fillStyle = `rgba(190,200,212,${this.veil})`;
       g.fillRect(0, 0, this.width, this.bottom);
@@ -334,65 +297,8 @@ class CanvasWindshield implements Windshield {
       g.drawImage(d.sprite, d.x - d.r, d.y - d.r, d.r * 2, d.r * 2);
     }
     g.globalAlpha = 1;
-    if (this.mirrored) {
-      g.translate(this.width, 0);
-      g.scale(-1, 1);
-    }
     this.drawSmear();
-    g.restore();
-    if (this.mist > 0) this.mistSideWindows();
-  }
-
-  /** Rain stays off the side windows, but they steam up along with the windshield. */
-  private mistSideWindows(): void {
-    const g = this.ctx;
-    g.save();
-    // Not over the parts of the cabin in front of it, such as the nav screen; the pillars are where the side glass starts.
-    for (const { object, points } of this.occluders) {
-      if (this.pillars.some(p => p.points === points)) continue;
-      g.beginPath();
-      g.rect(0, 0, this.width, this.height);
-      points.forEach((p, i) => {
-        const s = this.project(p.x, p.y, p.z, object);
-        if (i === 0) g.moveTo(s.x, s.y);
-        else g.lineTo(s.x, s.y);
-      });
-      g.closePath();
-      g.clip('evenodd');
-    }
-    g.fillStyle = `rgba(110,118,130,${this.mist})`;
-    for (const { object, points } of this.sideWindows) {
-      g.beginPath();
-      points.forEach((p, i) => {
-        const s = this.project(p.x, p.y, p.z, object);
-        if (i === 0) g.moveTo(s.x, s.y);
-        else g.lineTo(s.x, s.y);
-      });
-      g.closePath();
-      g.fill();
-    }
-    g.restore();
-  }
-
-  /** Between roof and dash, minus whatever sits inside the car in front of the glass. */
-  private clipToGlass(): void {
-    const g = this.ctx;
-    g.beginPath();
-    g.rect(0, this.top, this.width, this.bottom - this.top);
-    g.clip();
-    // One clip per occluder: with a single even-odd path, any two that overlap, or one reaching past the
-    // glass, would cancel out and let rain show through where they meet.
-    for (const { object, points } of this.occluders) {
-      g.beginPath();
-      g.rect(0, 0, this.width, this.height);
-      points.forEach((p, i) => {
-        const s = this.project(p.x, p.y, p.z, object);
-        if (i === 0) g.moveTo(s.x, s.y);
-        else g.lineTo(s.x, s.y);
-      });
-      g.closePath();
-      g.clip('evenodd');
-    }
+    this.texture.needsUpdate = true;
   }
 
   private drawTrails(): void {
@@ -431,11 +337,11 @@ class CanvasWindshield implements Windshield {
   /** The film of water a blade leaves behind as it sweeps. */
   private drawSmear(): void {
     if (!this.wetGlass || this.wiperMotion === 0) return;
-    const g = this.ctx, L = this.wiperLength, th = this.wiperAngle;
+    const g = this.ctx, th = this.wiperAngle;
     const from = -th, to = -(th - Math.sign(this.wiperMotion) * SMEAR_ANGLE);
     g.strokeStyle = 'rgba(205,218,238,.09)';
     g.lineWidth = 1.5;
-    for (const [px, py] of this.wiperPivots) {
+    for (const [px, py, L] of this.wiperPivots) {
       for (const r of SMEAR_RADII) {
         g.beginPath();
         g.arc(px, py, r * L, Math.min(from, to), Math.max(from, to));
@@ -445,9 +351,9 @@ class CanvasWindshield implements Windshield {
   }
 
   private drawWipers(): void {
-    const g = this.ctx, th = this.wiperAngle, L = this.wiperLength;
+    const g = this.ctx, th = this.wiperAngle;
     const cos = Math.cos(th), sin = Math.sin(th);
-    for (const [px, py] of this.wiperPivots) {
+    for (const [px, py, L] of this.wiperPivots) {
       g.strokeStyle = '#060607';
       g.lineCap = 'round';
       g.lineWidth = Math.max(5, L * WIPER_ARM_WIDTH);
@@ -465,14 +371,6 @@ class CanvasWindshield implements Windshield {
   }
 }
 
-export function createWindshield(
-  canvas: HTMLCanvasElement,
-  camera: THREE.Camera,
-  roof: THREE.Object3D,
-  occluders: readonly GlassOccluder[],
-  sideWindows: readonly GlassOccluder[],
-  pillars: readonly GlassOccluder[],
-  lampTint: LampTint
-): Windshield {
-  return new CanvasWindshield(canvas, camera, roof, occluders, sideWindows, pillars, lampTint);
+export function createWindshield(canvas: HTMLCanvasElement, lampTint: LampTint): Windshield {
+  return new CanvasWindshield(canvas, lampTint);
 }

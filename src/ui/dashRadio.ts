@@ -9,14 +9,13 @@ export interface RadioActions {
 }
 
 /**
- * Lets the dashboard radio be used with a mouse or finger: drag the volume,
- * press the buttons, tap the dial. The volume is mirrored in a hidden range
+ * Lets the dashboard radio be used with a mouse or finger: press the buttons and tap the dial; the volume
+ * knob is turned from main. The volume is mirrored in a hidden range
  * input for keyboards and screen readers; stations are in the Sound tab too.
  */
 export function bindDashRadio(canvas: HTMLCanvasElement, camera: THREE.Camera, radio: CarRadio, input: HTMLInputElement, actions: RadioActions): (level: number) => void {
   const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), plane = new THREE.Plane();
   const normal = new THREE.Vector3(), origin = new THREE.Vector3(), point = new THREE.Vector3();
-  let dragging = false;
 
   /** Where on the radio's canvas a pointer is, even off its edge, or null if it's pointing away from it. */
   const canvasPoint = (e: PointerEvent): { x: number; y: number } | null => {
@@ -31,32 +30,19 @@ export function bindDashRadio(canvas: HTMLCanvasElement, camera: THREE.Camera, r
   };
   const hitAt = (e: PointerEvent) => {
     const p = canvasPoint(e);
-    return p ? radio.hit(p.x, p.y, dragging) : null;
+    return p ? radio.hit(p.x, p.y) : null;
   };
 
   canvas.addEventListener('pointerdown', e => {
     const hit = hitAt(e);
     if (!hit) return;
-    if (hit.kind === 'volume') {
-      dragging = true;
-      canvas.setPointerCapture(e.pointerId);
-      canvas.style.cursor = 'grabbing';
-      actions.volume(hit.level);
-    } else if (hit.kind === 'station') actions.station(hit.index);
+    if (hit.kind === 'station') actions.station(hit.index);
     else if (hit.kind === 'seek') actions.seek();
     else actions.power();
   });
   canvas.addEventListener('pointermove', e => {
-    const hit = hitAt(e);
-    if (dragging && hit?.kind === 'volume') actions.volume(hit.level);
-    else if (!dragging) canvas.style.cursor = !hit ? '' : hit.kind === 'volume' ? 'grab' : 'pointer';
+    canvas.style.cursor = hitAt(e) ? 'pointer' : '';
   });
-  const release = () => {
-    dragging = false;
-    canvas.style.cursor = '';
-  };
-  canvas.addEventListener('pointerup', release);
-  canvas.addEventListener('pointercancel', release);
   input.addEventListener('input', () => actions.volume(Number(input.value)));
 
   return level => {

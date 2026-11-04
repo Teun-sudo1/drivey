@@ -141,42 +141,18 @@ export async function mirrorRect(page: Page): Promise<Rect> {
   });
 }
 
-/** A box guaranteed to lie inside the mirror, whose outline is slanted by perspective. */
-export async function mirrorInnerRect(page: Page): Promise<Rect> {
-  await page.waitForFunction(() => window.__drivey.stage.settled);
+/** How many pixels of the windshield's texture carry water, mist or frost. */
+export async function glassPixels(page: Page): Promise<number> {
   return page.evaluate(() => {
-    const { cockpit, stage } = window.__drivey;
-    stage.camera.updateMatrixWorld(true);
-    const { object, points } = cockpit.mirror.occluders[0];
-    const screen = points.map((p: any) => {
-      const v = object.localToWorld(p.clone()).project(stage.camera);
-      return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
-    });
-    const xs = screen.map((s: any) => s.x), ys = screen.map((s: any) => s.y);
-    // Generous, for the rounded corners, the slant and a glass a frame behind on a slow machine.
-    const inset = 14;
-    return { left: Math.min(...xs) + inset, right: Math.max(...xs) - inset, top: Math.min(...ys) + inset, bottom: Math.max(...ys) - inset };
-  });
-}
-
-/** How many pixels on the windshield layer are drawn in the given area, or all of it. */
-export async function glassPixels(page: Page, rect?: Rect): Promise<number> {
-  return page.evaluate(r => {
     // Simulated steps don't paint the glass; frames do.
     window.__drivey.windshield.draw();
     const canvas = document.querySelector<HTMLCanvasElement>('#glass')!;
-    const scale = canvas.width / canvas.clientWidth;
-    const x = Math.max(0, Math.floor((r?.left ?? 0) * scale)), y = Math.max(0, Math.floor((r?.top ?? 0) * scale));
-    // Measured from the clamped corner, so a rect hanging off the screen doesn't spill past its far edge.
-    const w = Math.min(canvas.width, Math.ceil((r?.right ?? canvas.clientWidth) * scale)) - x;
-    const h = Math.min(canvas.height, Math.ceil((r?.bottom ?? canvas.clientHeight) * scale)) - y;
-    if (w <= 0 || h <= 0) return 0;
-    const d = canvas.getContext('2d')!.getImageData(x, y, w, h).data;
+    const d = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
     let n = 0;
     // The wipers are always on the glass, near-black; water and mist are light. The faintest edges round to any colour.
     for (let i = 3; i < d.length; i += 4) if (d[i] > 8 && d[i - 3] + d[i - 2] + d[i - 1] > 60) n++;
     return n;
-  }, rect);
+  });
 }
 
 /** Average brightness (0 to 255) of the rendered scene around a screen point. */

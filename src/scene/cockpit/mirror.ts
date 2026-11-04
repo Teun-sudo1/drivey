@@ -4,7 +4,7 @@ import { clamp } from '../../lib/math';
 import type { MirrorLamps } from '../../routes/types';
 import { BOX, mesh } from '../geometry';
 import { MIRROR_DISTANCE, MIRROR_OUTER_HEIGHT, type Framing } from '../stage';
-import type { GlassOccluder } from './cockpit';
+import type { Outline } from './cockpit';
 
 const HOUSING_MARGIN = 0.012;
 const WIDTH = 0.32, HEIGHT = MIRROR_OUTER_HEIGHT - HOUSING_MARGIN, RADIUS = 0.024;
@@ -84,8 +84,8 @@ function quad(x0: number, x1: number, y0: number, y1: number): THREE.Vector3[] {
  * a second camera, which would double the scene's draw calls.
  */
 export class Mirror {
-  /** Its outline, so the windshield layer can leave it out. */
-  readonly occluders: GlassOccluder[];
+  /** Its outline, for finding it on screen. */
+  readonly occluders: Outline[];
 
   private readonly group = new THREE.Group();
   private readonly stem: THREE.Mesh;

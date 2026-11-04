@@ -42,10 +42,8 @@ export interface RadioState {
   on: boolean;
 }
 
-export type RadioHit = { kind: 'volume'; level: number } | { kind: 'station'; index: number } | { kind: 'seek' } | { kind: 'power' };
+export type RadioHit = { kind: 'station'; index: number } | { kind: 'seek' } | { kind: 'power' };
 
-/** How close to the volume scale, in canvas pixels, a press still takes hold of it. */
-const VOLUME_GRAB = 18;
 
 /**
  * The car radio, styled like the gauges: a tuning dial with a station for each
@@ -70,7 +68,7 @@ export class CarRadio {
   private readonly capBodies: THREE.Mesh;
   private readonly capFaces: THREE.Mesh;
   private pressed: number | null | undefined;
-  /** The housing's outline, local to `group`, so rain on the glass leaves it clear; kept up to date as it's rearranged. */
+  /** The housing's outline, local to `group`, for finding it on screen; kept up to date as it's rearranged. */
   readonly outline = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
   private readonly ctx: CanvasRenderingContext2D;
   private readonly texture: THREE.CanvasTexture;
@@ -205,11 +203,8 @@ export class CarRadio {
     return { presets: PRESETS.map(centre), seek: centre(SEEK), power: centre(POWER), volume: VOLUME, stations: STATIONS.map((_, i) => ({ x: stationX(i), y: DIAL.y - 20 })) };
   }
 
-  /** What a press at a canvas point lands on; `dragging` keeps hold of the volume past its ends. */
-  hit(x: number, y: number, dragging = false): RadioHit | null {
-    const level = THREE.MathUtils.clamp((x - VOLUME.x0) / (VOLUME.x1 - VOLUME.x0), 0, 1);
-    if (dragging) return { kind: 'volume', level };
-    if (Math.abs(y - VOLUME.y) < VOLUME_GRAB && x > VOLUME.x0 - 12 && x < VOLUME.x1 + 12) return { kind: 'volume', level };
+  /** What a press at a canvas point lands on. The volume scale only shows the level; the knob beside it sets it. */
+  hit(x: number, y: number): RadioHit | null {
     const inside = (b: { x: number; w: number }) => x >= b.x && x <= b.x + b.w && y >= BUTTON_Y && y <= BUTTON_Y + BUTTON_H;
     const preset = PRESETS.findIndex(inside);
     if (preset >= 0) return { kind: 'station', index: preset };

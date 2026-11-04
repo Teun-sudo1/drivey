@@ -16,6 +16,7 @@
 </head>
 <body class="parked">
 <div id="intro" aria-hidden="true"><h1>DRIVEY</h1></div>
+<div id="fps" hidden></div>
 <canvas id="gl" aria-hidden="true"></canvas>
 <canvas id="glass" aria-hidden="true"></canvas>
 <div id="vignette"></div>
@@ -79,6 +80,7 @@
       <div class="tog" data-k="vignette">Vignette</div>
       <div class="tog" data-k="grain">Film grain</div>
       <div class="tog" data-k="reduced">Reduced motion</div>
+      <div class="tog" data-k="fps">Frame rate counter</div>
     </section>
     <section id="tab-sound">
       <h4>Music</h4>
@@ -163,6 +165,7 @@
     <label class="pov"><span>Close</span><input type="range" id="startPov" min="0" max="1" step="0.01" aria-label="How far back you sit"><span>Sat back</span></label>
     <p class="note">You can change this later in Settings › Scene.</p>
     <button class="start-go" id="btnSeated">Settle in</button>
+    <button class="start-quick" id="btnQuickStart">Start driving</button>
   </div>
   <div class="start-card" id="startSetup">
     <h1>DRIVEY</h1>

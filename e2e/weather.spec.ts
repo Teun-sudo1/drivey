@@ -1,4 +1,5 @@
-import { advance, brightnessAt, expect, glassPixels, isPortrait, mirrorInnerRect, openApp, openSceneTab, screenOf, test, update } from './support';
+import { GLASS_W } from '../src/weather/windshield';
+import { advance, brightnessAt, expect, glassPixels, openApp, openSceneTab, screenOf, test, update } from './support';
 
 test.describe('time of day and weather controls', () => {
   test('choosing them updates the label, saves and blends gradually', async ({ page }) => {
@@ -46,7 +47,7 @@ test.describe('time of day and weather controls', () => {
 test.describe('windshield', () => {
   const wiper = (page: any) => page.evaluate(() => {
     const { windshield } = window.__drivey;
-    return { angle: windshield.wiperAngle, length: windshield.wiperLength, period: windshield.wiperPeriod };
+    return { angle: windshield.wiperAngle, lengths: windshield.wiperPivots.map((p: number[]) => p[2]), period: windshield.wiperPeriod };
   });
 
   test('wipers sweep in rain and stay parked when clear', async ({ page }) => {
@@ -63,13 +64,12 @@ test.describe('windshield', () => {
     expect((await wiper(page)).angle).toBe(parked);
   });
 
-  test('wipers are long enough for the shape of the glass', async ({ page }) => {
+  test('the two wipers are each long enough for their half of the glass', async ({ page }) => {
     await openApp(page, { weather: 'rain' });
-    const { length } = await wiper(page);
-    const width = page.viewportSize()!.width;
-    // On a phone they used to stop at 45% of the narrow width, barely covering the tall glass.
-    if (isPortrait(page)) expect(length).toBeGreaterThan(width * 0.9);
-    else expect(length).toBeGreaterThan(width * 0.3);
+    const { lengths } = await wiper(page);
+    // Each reaches about a third of the way across the glass, the driver's a little further.
+    for (const length of lengths) expect(length).toBeGreaterThan(GLASS_W * 0.3);
+    expect(lengths[0]).toBeGreaterThan(lengths[1]);
   });
 
   test('drops gather in rain, leave trails, and dry up when it stops', async ({ page }) => {
@@ -116,37 +116,6 @@ test.describe('windshield', () => {
     expect(await glassPixels(page)).toBe(0);
   });
 
-  for (const driveSide of ['left', 'right'] as const) {
-    test(`with the wheel on the ${driveSide === 'left' ? 'right' : 'left'}, rain and wipers stay inside the pillars`, async ({ page }) => {
-      test.skip(isPortrait(page), 'the pillars are off screen in portrait');
-      await openApp(page, { weather: 'heavy', driveSide });
-      // Strips just beyond each A-pillar, at its middle, out to the edge of the screen.
-      const outside = await page.evaluate(() => {
-        const { cockpit, stage } = window.__drivey;
-        stage.camera.updateMatrixWorld(true);
-        return cockpit.pillars.map((o: any) => {
-          const screen = o.points.map((p: any) => {
-            const v = o.object.localToWorld(p.clone()).project(stage.camera);
-            return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (0.5 - v.y * 0.5) * innerHeight };
-          });
-          // The outline starts at the pillar's foot, runs up it, and ends far out beyond its foot.
-          const [bottomInner, topInner] = screen, farOut = screen[screen.length - 1];
-          const mid = { x: (bottomInner.x + topInner.x) / 2, y: (bottomInner.y + topInner.y) / 2 };
-          const out = Math.sign(farOut.x - bottomInner.x);
-          return out > 0
-            ? { left: Math.min(innerWidth, mid.x + 10), right: innerWidth, top: mid.y - 25, bottom: mid.y + 25 }
-            : { left: 0, right: Math.max(0, mid.x - 10), top: mid.y - 25, bottom: mid.y + 25 };
-        });
-      });
-      expect(outside.some((r: any) => r.right - r.left > 20)).toBe(true);
-      // Across a few wiper strokes, with drops landing everywhere.
-      for (let i = 0; i < 6; i++) {
-        await advance(page, 0.4);
-        for (const rect of outside) expect(await glassPixels(page, rect)).toBe(0);
-      }
-      expect(await glassPixels(page)).toBeGreaterThan(50);
-    });
-  }
 
   test('empty glass is left alone rather than repainted every frame', async ({ page }) => {
     await openApp(page, { weather: 'clear' });
@@ -163,42 +132,7 @@ test.describe('windshield', () => {
     expect(clears).toBeLessThanOrEqual(1);
   });
 
-  test('where two parts of the car overlap, the glass stays clear of both', async ({ page }) => {
-    await openApp(page, { weather: 'heavy' });
-    // Two overlapping panels in front of the glass, as the interior's parts can be.
-    const areas = await page.evaluate(() => {
-      const { cockpit, stage } = window.__drivey;
-      const camera = stage.camera;
-      const V = (x: number, y: number) => camera.position.clone().set(x, y, -1);
-      cockpit.glassOccluders.push(
-        { object: camera, points: [V(-0.3, -0.2), V(0.1, -0.2), V(0.1, 0.25), V(-0.3, 0.25)] },
-        { object: camera, points: [V(-0.2, -0.25), V(0.2, -0.25), V(0.2, 0.2), V(-0.2, 0.2)] }
-      );
-      camera.updateMatrixWorld(true);
-      const rect = (x0: number, y0: number, x1: number, y1: number) => {
-        const a = camera.localToWorld(V(x0, y1)).project(camera), b = camera.localToWorld(V(x1, y0)).project(camera);
-        return { left: (a.x * 0.5 + 0.5) * innerWidth + 3, right: (b.x * 0.5 + 0.5) * innerWidth - 3, top: (0.5 - a.y * 0.5) * innerHeight + 3, bottom: (0.5 - b.y * 0.5) * innerHeight - 3 };
-      };
-      return { overlap: rect(-0.2, -0.2, 0.1, 0.2) };
-    });
-    await advance(page, 6);
-    // Rain lands on the rest of the glass meanwhile.
-    expect(await glassPixels(page)).toBeGreaterThan(0);
-    expect(await glassPixels(page, areas.overlap)).toBe(0);
-  });
 
-  test('nothing on the glass is drawn over the mirror or below the dashboard', async ({ page }) => {
-    await openApp(page, { weather: 'heavy' });
-    await advance(page, 3);
-    await expect.poll(() => glassPixels(page)).toBeGreaterThan(50);
-    const size = page.viewportSize()!;
-    const dash = await page.evaluate(() => window.__drivey.windshield.bottom);
-    for (let i = 0; i < 6; i++) {
-      expect(await glassPixels(page, await mirrorInnerRect(page))).toBe(0);
-      expect(await glassPixels(page, { left: 0, right: size.width, top: dash + 2, bottom: size.height })).toBe(0);
-      await page.waitForTimeout(250);
-    }
-  });
 });
 
 test.describe('road surface', () => {
