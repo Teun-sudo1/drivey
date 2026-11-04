@@ -84,6 +84,8 @@ body.idle { cursor: none; }
   opacity: 0; transition: .35s; pointer-events: none;
 }
 #toast.on { opacity: 1; transform: translate(-50%, 0); }
+/* Sideways the timer sits at the top, so notices drop below it and its label. */
+@media (orientation: landscape) { #toast { top: calc(min(11vh, 84px) + 54px + var(--st)); } }
 
 /* Parked: nothing but the start screen until the engine runs */
 body.parked #hud { visibility: hidden; }
