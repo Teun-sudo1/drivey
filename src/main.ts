@@ -112,8 +112,10 @@ const LOOK_PER_PX = 0.004;
     windshield.airCon = on;
     cockpit.setAirCon(on);
   };
-  // The radio's volume knob turns as it's dragged up or down.
-  let turning: { y: number; volume: number } | null = null;
+  // The radio's volume knob turns as it's dragged up or right, and back down or left.
+  let turning: { x: number; y: number; volume: number } | null = null;
+  /** How far a drag has gone, in pixels: up and right count as turning clockwise, down and left back. */
+  const turnedBy = (from: { x: number; y: number }, e: PointerEvent): number => from.y - e.clientY + e.clientX - from.x;
   // The fan knob turns and the temperature lever slides, just for the feel of it.
   let fiddling: { control: 'fan' | 'temp'; x: number; y: number } | null = null;
   // Dragging anywhere else turns the head to look around the car; the button beside fullscreen faces forward again.
@@ -131,12 +133,12 @@ const LOOK_PER_PX = 0.004;
       btnLook.hidden = false;
     }
     if (fiddling) {
-      if (fiddling.control === 'fan') cockpit.turnFan((fiddling.y - e.clientY) * FIDDLE_TURN_PER_PX);
+      if (fiddling.control === 'fan') cockpit.turnFan(turnedBy(fiddling, e) * FIDDLE_TURN_PER_PX);
       else cockpit.slideTemp((e.clientX - fiddling.x) * FIDDLE_SLIDE_PER_PX);
       fiddling = { ...fiddling, x: e.clientX, y: e.clientY };
     }
     if (!turning) return;
-    const dy = (turning.y - e.clientY) / KNOB_DRAG_PX;
+    const dy = turnedBy(turning, e) / KNOB_DRAG_PX;
     settings.update({ mix: { ...settings.value.mix, music: Math.min(1, Math.max(0, turning.volume + dy * 0.25)) } });
   });
   addEventListener('pointerup', () => (turning = looking = fiddling = null));
@@ -149,7 +151,7 @@ const LOOK_PER_PX = 0.004;
     ray.setFromCamera(at, stage.camera);
     // The knobs are small, so a press anywhere a fingertip away from one takes hold of it.
     if (pxFrom(cockpit.radio.volumeKnob, e) < KNOB_GRAB_PX) {
-      turning = { y: e.clientY, volume: settings.value.mix.music };
+      turning = { x: e.clientX, y: e.clientY, volume: settings.value.mix.music };
       gl.setPointerCapture(e.pointerId);
       return;
     }
