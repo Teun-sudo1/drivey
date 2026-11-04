@@ -38,6 +38,8 @@ const PILLAR_ENDS: [THREE.Vector3, THREE.Vector3, number][] = [
 ];
 /** How far the fan knob turns either way, and half the temperature slot's length, local to the climate panel. */
 const FAN_STOP = 2.4, TEMP_SLOT = 0.0283;
+/** How far back of the wheel the eye sits, on average across the seat range, for fitting the glass to the pillars. */
+const GLASS_EYE_BACK = 0.1;
 /** Where the roof's front edge runs, above the windshield, and how far up each pillar starts sweeping into it. */
 const ROOF_EDGE = { y: 0.487, z: -1.09 }, PILLAR_SWEEP_FROM = 0.45;
 /** Where the lever leaves the console, how far it leans back, and its reach up into the gap between radio and wheel. */
@@ -288,9 +290,16 @@ export class Cockpit {
   /** The windshield panel, between the pillars from the dash to the roof, showing what's on the glass. */
   addGlass(texture: THREE.Texture): void {
     const [left, right] = PILLAR_ENDS, inset = PILLAR_WIDTH / 2;
+    // The pillars rake back far past the glass, so its top corners go where the pillars' heads appear from the
+    // driver's seat, along the line of sight to them, at the roof's front edge.
+    const eye = new THREE.Vector3(DRIVER_X, 0, GLASS_EYE_BACK);
+    const top = (head: THREE.Vector3, x: number) => {
+      const at = new THREE.Vector3(x, head.y, head.z), t = (ROOF_EDGE.z - eye.z) / (at.z - eye.z);
+      return [eye.x + (at.x - eye.x) * t, ROOF_EDGE.y, ROOF_EDGE.z];
+    };
     const corners = [
       [GLASS_X0, left[0].y, left[0].z], [GLASS_X1, right[0].y, right[0].z],
-      [right[1].x - inset, ROOF_EDGE.y, ROOF_EDGE.z], [left[1].x + inset, ROOF_EDGE.y, ROOF_EDGE.z]
+      top(right[1], right[1].x - inset), top(left[1], left[1].x + inset)
     ];
     const glass = new THREE.BufferGeometry();
     glass.setAttribute('position', new THREE.Float32BufferAttribute(corners.flat(), 3));

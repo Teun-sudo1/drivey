@@ -344,13 +344,13 @@ class CanvasWindshield implements Windshield {
   }
 
   /** Condensation: thickest up top, thinning towards the vents at the bottom of the glass. */
-  /** Condensation: a milky film, lit like the night or day outside, thicker towards the bottom, beaded with tiny droplets. */
+  /** Condensation: a milky film, lit like the night or day outside and opaque, so nothing of the drive shows until the driver settles in, beaded with tiny droplets. */
   private drawMist(): void {
     const g = this.ctx, fade = g.createLinearGradient(0, this.top, 0, this.bottom);
     const shade = (day: number, night: number): number => Math.round(lerp(day, night, this.dark));
     const tone = (day: number[], night: number[], alpha: number) => `rgba(${day.map((d, i) => shade(d, night[i])).join()},${alpha * this.mist})`;
-    fade.addColorStop(0, tone([150, 158, 170], [38, 42, 52], 0.86));
-    fade.addColorStop(1, tone([120, 128, 140], [30, 33, 41], 0.97));
+    fade.addColorStop(0, tone([150, 158, 170], [38, 42, 52], 1));
+    fade.addColorStop(1, tone([120, 128, 140], [30, 33, 41], 1));
     g.fillStyle = fade;
     g.fillRect(0, this.top, this.width, this.bottom - this.top);
     g.globalAlpha = this.mist * lerp(0.9, 0.5, this.dark);
